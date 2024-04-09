@@ -1,0 +1,50 @@
+.program pinsToggle
+
+.wrap_target
+    set y, 0          ; // Initialize with zero
+    pull block        ; // Get new data from FIFO buffer (pin configurations)
+ 
+    out pins, 4 [15]  ; // Set new state from first four bits of OSR (wait 15 cycles, 0.6 us @ 25 MHz)
+    out pins, 4       ; // Set new state from next four bits of OSR
+ 
+    out y, 16         ; // Move next 16 bits into scratch (OSR -> y)
+ 
+lp1:
+    jmp y-- lp1       ; // Wait for y cycles
+ 
+    out pins, 4 [15]  ; // Set new state from next four bits of OSR (wait 15 cycles, 0.6 us @ 25 MHz)
+    out pins, 4       ; // Set new state from next four bits of OSR
+ 
+.wrap
+
+% c-sdk {
+
+// Helper function (for use in C program) to initialize this PIO program
+void pinsToggle_program_init(PIO pio, uint sm, uint offset, uint startPin, float div) {
+
+    // Sets up state machine and wrap target. This function is automatically
+    // generated in pinsToggle.pio.h.
+    pio_sm_config c = pinsToggle_program_get_default_config(offset);
+
+    // Allow PIO to control GPIO pins (as output)
+    for (int i = 0; i < 4; i++){
+        pio_gpio_init(pio, startPin + i);
+    }
+
+    // Connect pin to SET pin (control with 'set' instruction)
+    sm_config_set_out_pins(&c, startPin, 4);
+
+    // Set the pin direction to output (in PIO)
+    pio_sm_set_consecutive_pindirs(pio, sm, startPin, 4, true);
+
+    // set shift such that bits shifted by 'out' end up in the lower 16 bits
+    sm_config_set_out_shift(&c, true, false, 0);
+    
+    // Set the clock divider for the state machine
+    sm_config_set_clkdiv(&c, div);
+
+    // Load configuration and jump to start of the program
+    pio_sm_init(pio, sm, offset, &c);
+}
+
+%}
