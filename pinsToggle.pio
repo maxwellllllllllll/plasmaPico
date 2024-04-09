@@ -45,6 +45,8 @@ void pinsToggle_program_init(PIO pio, uint sm, uint offset, uint startPin, float
 
     // Load configuration and jump to start of the program
     pio_sm_init(pio, sm, offset, &c);
+
+    pio_sm_set_enabled(pio, sm, true);
 }
 
 %}

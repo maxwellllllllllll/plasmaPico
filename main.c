@@ -41,7 +41,7 @@ void on_pwm_wrap() {
     cycleCount++;
     if (cycleCount > 200) {cycleCount=0;} // Wrap cycle count for test
 }
-
+ 
 
 int main() {
     stop2free = (S2 | S4) << 4;  // Turn on S2 and S4
@@ -79,28 +79,20 @@ int main() {
     pinsToggle_program_init(pio, sm, offset, startPin, div);
 
 
-    // Use PWM wrapping for timing
-    pwm_clear_irq(0);
-    pwm_set_irq_enabled(0, true);
-    irq_set_exclusive_handler(PWM_IRQ_WRAP, on_pwm_wrap);
-    irq_set_enabled(PWM_IRQ_WRAP, true);
- 
     pwm_config config = pwm_get_default_config();
-    // pwm_config_set_clkdiv(&config, 5.f); // Use system clock frequency (25 MHz)
+    pwm_config_set_clkdiv(&config, 5.f); // Use system clock frequency (25 MHz)
     pwm_config_set_wrap(&config, 499);   // Wrap every 20 us (0-499)
     pwm_init(0, &config, false);
 
 
-    // Turn on SPA in freewheeling state and activate PWM
     uint32_t delay = 10*25;
+
     nextState = (stop2free << 24) | (( delay << 8) | free2stop);
-    pio_sm_put(pio0, sm, nextState);
-    busy_wait_ms(2000);
+    pio_sm_put(pio0, sm, nextState); 
+
     pwm_set_enabled(0, true);
 
     busy_wait_ms(2000);
-
-
     // Ramp positive pulses
     for (int i=0; i<=17; i++) {
         sleep_ms(1000);
@@ -114,7 +106,8 @@ int main() {
         delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
         nextState = (neg2free << 24) | ( delay << 8) | free2neg;
     }
- 
+
+
     // Turn off PWM
     pwm_set_enabled(0, false);
     irq_set_enabled(PWM_IRQ_WRAP, false);
