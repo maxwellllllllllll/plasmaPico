@@ -7,8 +7,16 @@
 #include "pinsToggle.pio.h"
 
 
- uint32_t S1 = 0x00000008; // 1000
- uint32_t nextState;
+// pin "addresses"
+uint32_t S1 = 0x00000008; // 1000
+uint32_t S2 = 0x00000004; // 0100
+uint32_t S3 = 0x00000002; // 0010
+uint32_t S4 = 0x00000001; // 0001
+
+// States
+uint32_t stop2free, free2stop, free2poss, free2neg, poss2free, neg2free;
+uint32_t freeCycle, possCycle, negCycle;
+uint32_t nextState, cycleCount;
 
 
 int main() {
@@ -32,12 +40,16 @@ int main() {
     pinsToggle_program_init(pio, sm, offset, startPin, div);
 
     
+    // Writes a state (word of data) to a state machine's TX FIFO
     pio_sm_put(pio0, sm, S1);
 
     busy_wait_ms(2000);
 
     // Start running our PIO program in the state machine
     pwm_set_enabled(0, true);
+
+    // Writes annother state (word of data) to state machine's TX FIFO
+    pio_sm_put(pio0, sm, S2);
 
     // Do nothing
     while (true) {
