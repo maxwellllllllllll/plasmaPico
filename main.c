@@ -23,6 +23,21 @@ int main() {
     static const uint startPin = 10;
     static const float pio_freq = 64000;
 
+    // state definitions
+    stop2free = (S2 | S4) << 4;  // Turn on S2 and S4
+    free2stop = 0;  // Turn all off
+    freeCycle = ((S2 | S4) << 28) | ((S2 | S4) << 24) | ((S2 | S4) << 4) | (S2 | S4);
+ 
+    free2poss = ((S2 | S3) << 4) | S2;  // S2 only then S2 and S3
+    poss2free = ((S2 | S4) << 4) | S2;  // S2 only then S2 and S4
+    possCycle = (poss2free << 24) | free2poss;
+ 
+    free2neg = ((S1 | S4) << 4) | S4;  // S4 only then S1 and S4
+    neg2free = ((S2 | S4) << 4) | S4;  // S4 only then S2 and S4
+    negCycle = (neg2free << 24) | free2neg;
+ 
+    cycleCount = 0;
+
     // Choose PIO instance (0 or 1)
     PIO pio = pio0;
 
