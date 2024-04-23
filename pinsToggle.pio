@@ -5,7 +5,16 @@
     pull block        ; // Get new data from FIFO buffer (pin configurations)
  
     out pins, 4 [15]  ; // Set new state from first four bits of OSR (wait 15 cycles, 0.6 us @ 25 MHz)
-
+    out pins, 4       ; // Set new state from next four bits of OSR
+ 
+    out y, 16         ; // Move next 16 bits into scratch (OSR -> y)
+ 
+lp1:
+    jmp y-- lp1       ; // Wait for y cycles
+ 
+    out pins, 4 [15]  ; // Set new state from next four bits of OSR (wait 15 cycles, 0.6 us @ 25 MHz)
+    out pins, 4       ; // Set new state from next four bits of OSR
+ 
 .wrap
 
 % c-sdk {

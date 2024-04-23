@@ -19,6 +19,18 @@ uint32_t freeCycle, possCycle, negCycle;
 uint32_t nextState, cycleCount;
 
 
+void stepthru_test(uint sm) {
+    pio_sm_put(pio0, sm, stop2free);
+    
+    busy_wait_ms(1000);
+
+    pwm_set_enabled(0, true);
+
+    pio_sm_put(pio0, sm, free2poss);
+
+}
+
+
 int main() {
     static const uint startPin = 10;
     static const float pio_freq = 64000;
@@ -54,17 +66,19 @@ int main() {
     // Initialize the program using the helper function in our .pio file
     pinsToggle_program_init(pio, sm, offset, startPin, div);
 
+
+    stepthru_test(sm);
     
     // Writes a state (word of data) to a state machine's TX FIFO
-    pio_sm_put(pio0, sm, S1);
+    //pio_sm_put(pio0, sm, stop2free);
 
-    busy_wait_ms(2000);
+    //busy_wait_ms(1000);
 
     // Start running our PIO program in the state machine
-    pwm_set_enabled(0, true);
+    //pwm_set_enabled(0, true);
 
     // Writes annother state (word of data) to state machine's TX FIFO
-    pio_sm_put(pio0, sm, S2);
+    //pio_sm_put(pio0, sm, possCycle);
 
     // Do nothing
     while (true) {
