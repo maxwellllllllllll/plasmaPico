@@ -113,29 +113,25 @@ int main() {
     // Turn on SPA in freewheeling state and activate PWM
     uint32_t delay = 250;
     nextState = (stop2free << 24) | (( delay << 8) | free2stop);
-    nextState = (delay << 8) | (negCycle);
     //pio_sm_put(pio0, sm, nextState);
     
     //busy_wait_ms(1000);
 
     pwm_set_enabled(0, true);
 
-    busy_wait_ms(4000);
-
-
-    // // Ramp positive pulses
-    // for (int i=0; i<=17; i++) {
-    //     sleep_ms(1000);
-    //     delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
-    //     nextState = (poss2free << 24) | ( delay << 8) | free2poss;
-    // }
+    // Ramp positive pulses
+    for (int i=0; i<=17; i++) {
+        sleep_ms(1000);
+        delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
+        nextState = (poss2free << 24) | ( delay << 8) | free2poss;
+    }
  
-    // // Ramp negative pulses
-    // for (int i=0; i<=17; i++) {
-    //     sleep_ms(1000);
-    //     delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
-    //     nextState = (neg2free << 24) | ( delay << 8) | free2neg;
-    // }
+    // Ramp negative pulses
+    for (int i=0; i<=17; i++) {
+        sleep_ms(1000);
+        delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
+        nextState = (neg2free << 24) | ( delay << 8) | free2neg;
+    }
 
 
     // Turn off PWM
