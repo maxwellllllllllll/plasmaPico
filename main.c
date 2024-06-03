@@ -44,10 +44,10 @@ void on_pwm_wrap() {
     // Update nextState for next cycle
     uint32_t delay = 0;
     if (cycleCount < 100) { // Negative pulses
-        delay = 100; // Delay in PIO cycles @ 25 MHz
+        delay = (100-cycleCount)*5; // Delay in PIO cycles @ 25 MHz
         nextState = negCycle;
     } else { // Positive pulses
-        delay = 100; // Delay in PIO cycles @ 25 MHz
+        delay = (cycleCount-100)*5; // Delay in PIO cycles @ 25 MHz
         nextState = possCycle;
     }
  
