@@ -8,10 +8,10 @@
 
 
 // pin "addresses"
-uint32_t S1 = 0x00000008; // 1000
-uint32_t S2 = 0x00000004; // 0100
-uint32_t S3 = 0x00000002; // 0010
-uint32_t S4 = 0x00000001; // 0001
+uint32_t S4 = 0x00000008; // 1000
+uint32_t S3 = 0x00000004; // 0100
+uint32_t S2 = 0x00000002; // 0010
+uint32_t S1 = 0x00000001; // 0001
 
 // States
 uint32_t stop2free, free2stop, free2poss, free2neg, poss2free, neg2free;
@@ -39,29 +39,31 @@ void stepthru_test(uint sm) {
 void on_pwm_wrap() {
     pwm_clear_irq(0);
     pio_sm_put(pio0, sm, nextState);
-    // pio0->txf[sm] = nextState; // Same as pio_sm_put without checking
+    // // pio0->txf[sm] = nextState; // Same as pio_sm_put without checking
  
-    // Update nextState for next cycle
-    uint32_t delay = 0;
-    if (cycleCount < 100) { // Negative pulses
-        delay = (100-cycleCount)*5; // Delay in PIO cycles @ 25 MHz
-        nextState = negCycle;
-    } else {                // Positive pulses
-        delay = (cycleCount-100)*5; // Delay in PIO cycles @ 25 MHz
-        nextState = possCycle;
-    }
+    // // Update nextState for next cycle
+    // uint32_t delay = 0;
+    // if (cycleCount < 100) { // Negative pulses
+    //     delay = 100; // Delay in PIO cycles @ 25 MHz
+    //     nextState = negCycle;
+    // } else {                // Positive pulses
+    //     delay = 100; // Delay in PIO cycles @ 25 MHz
+    //     nextState = possCycle;
+    // }
  
-    if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
-    if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
-    nextState = nextState | ( delay << 8);
+    // if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
+    // if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
+    // nextState = nextState | ( delay << 8);
  
-    cycleCount++;
+    // cycleCount++;
 }
 
 
 int main() {
     static const uint startPin = 10;
     static const float pio_freq = 1;
+
+    set_sys_clock_khz(125000, true); //125000
 
     // state definitions
     stop2free = (S2 | S4) << 4;  // Turn on S2 and S4
@@ -89,7 +91,7 @@ int main() {
     uint offset = pio_add_program(pio, &pinsToggle_program);
 
     // Calculate the PIO clock divider
-    float div = (float)clock_get_hz(clk_sys) / pio_freq;
+    float div = 5.f; //(float)clock_get_hz(clk_sys) / pio_freq;
 
     // Initialize the program using the helper function in our .pio file
     pinsToggle_program_init(pio, sm, offset, startPin, div);
@@ -108,10 +110,13 @@ int main() {
 
 
     // Turn on SPA in freewheeling state and activate PWM
-    uint32_t delay = 10*25;
+    uint32_t delay = 250;
     nextState = (stop2free << 24) | (( delay << 8) | free2stop);
-    pio_sm_put(pio0, sm, nextState);
+    nextState = (delay << 8) | (negCycle);
+    //pio_sm_put(pio0, sm, nextState);
     
+    //busy_wait_ms(1000);
+
     pwm_set_enabled(0, true);
 
     busy_wait_ms(4000);
@@ -139,7 +144,7 @@ int main() {
  
     // Return to off state
     pio_sm_put(pio0, sm, stop2free);
-    sleep_ms(1);
+    sleep_ms(1000);
  
     //Turn off pio
     pio_sm_set_enabled(pio0, sm, false);
