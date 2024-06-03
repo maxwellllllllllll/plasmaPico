@@ -41,21 +41,22 @@ void on_pwm_wrap() {
     pio_sm_put(pio0, sm, nextState);
     // // pio0->txf[sm] = nextState; // Same as pio_sm_put without checking
  
-    // // Update nextState for next cycle
-    // uint32_t delay = 0;
-    // if (cycleCount < 100) { // Negative pulses
-    //     delay = 100; // Delay in PIO cycles @ 25 MHz
-    //     nextState = negCycle;
-    // } else {                // Positive pulses
-    //     delay = 100; // Delay in PIO cycles @ 25 MHz
-    //     nextState = possCycle;
-    // }
+    // Update nextState for next cycle
+    uint32_t delay = 0;
+    if (cycleCount < 100) { // Negative pulses
+        delay = 100; // Delay in PIO cycles @ 25 MHz
+        nextState = negCycle;
+    } else { // Positive pulses
+        delay = 100; // Delay in PIO cycles @ 25 MHz
+        nextState = possCycle;
+    }
  
-    // if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
-    // if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
-    // nextState = nextState | ( delay << 8);
+    if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
+    if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
+    nextState = nextState | ( delay << 8);
  
-    // cycleCount++;
+    cycleCount++;
+    if (cycleCount > 200) {cycleCount=0;} // Wrap cycle count for test
 }
 
 
