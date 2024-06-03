@@ -18,6 +18,11 @@ uint32_t stop2free, free2stop, free2poss, free2neg, poss2free, neg2free;
 uint32_t freeCycle, possCycle, negCycle;
 uint32_t nextState, cycleCount;
 
+uint sm;
+
+
+const uint LED_PIN = 25;
+
 
 void stepthru_test(uint sm) {
     pio_sm_put(pio0, sm, stop2free);
@@ -31,9 +36,32 @@ void stepthru_test(uint sm) {
 }
 
 
+void on_pwm_wrap() {
+    pwm_clear_irq(0);
+    pio_sm_put(pio0, sm, nextState);
+    // pio0->txf[sm] = nextState; // Same as pio_sm_put without checking
+ 
+    // Update nextState for next cycle
+    uint32_t delay = 0;
+    if (cycleCount < 100) { // Negative pulses
+        delay = (100-cycleCount)*5; // Delay in PIO cycles @ 25 MHz
+        nextState = negCycle;
+    } else {                // Positive pulses
+        delay = (cycleCount-100)*5; // Delay in PIO cycles @ 25 MHz
+        nextState = possCycle;
+    }
+ 
+    if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
+    if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
+    nextState = nextState | ( delay << 8);
+ 
+    cycleCount++;
+}
+
+
 int main() {
     static const uint startPin = 10;
-    static const float pio_freq = 64000;
+    static const float pio_freq = 1;
 
     // state definitions
     stop2free = (S2 | S4) << 4;  // Turn on S2 and S4
@@ -67,18 +95,61 @@ int main() {
     pinsToggle_program_init(pio, sm, offset, startPin, div);
 
 
-    stepthru_test(sm);
+    // PWM wrapping setup
+    pwm_clear_irq(0);
+    pwm_set_irq_enabled(0, true);
+    irq_set_exclusive_handler(PWM_IRQ_WRAP, on_pwm_wrap);
+    irq_set_enabled(PWM_IRQ_WRAP, true);
+
+    pwm_config config = pwm_get_default_config();
+    pwm_config_set_clkdiv(&config, div); // Use system clock frequency (25 MHz)
+    pwm_config_set_wrap(&config, 499);   // Wrap every 20 us (0-499)
+    pwm_init(0, &config, false);
+
+
+    // Turn on SPA in freewheeling state and activate PWM
+    uint32_t delay = 10*25;
+    nextState = (stop2free << 24) | (( delay << 8) | free2stop);
+    pio_sm_put(pio0, sm, nextState);
     
-    // Writes a state (word of data) to a state machine's TX FIFO
-    //pio_sm_put(pio0, sm, stop2free);
+    pwm_set_enabled(0, true);
 
-    //busy_wait_ms(1000);
+    busy_wait_ms(4000);
 
-    // Start running our PIO program in the state machine
-    //pwm_set_enabled(0, true);
 
-    // Writes annother state (word of data) to state machine's TX FIFO
-    //pio_sm_put(pio0, sm, possCycle);
+    // // Ramp positive pulses
+    // for (int i=0; i<=17; i++) {
+    //     sleep_ms(1000);
+    //     delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
+    //     nextState = (poss2free << 24) | ( delay << 8) | free2poss;
+    // }
+ 
+    // // Ramp negative pulses
+    // for (int i=0; i<=17; i++) {
+    //     sleep_ms(1000);
+    //     delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
+    //     nextState = (neg2free << 24) | ( delay << 8) | free2neg;
+    // }
+
+
+    // Turn off PWM
+    pwm_set_enabled(0, false);
+    irq_set_enabled(PWM_IRQ_WRAP, false);
+    sleep_ms(1);
+ 
+    // Return to off state
+    pio_sm_put(pio0, sm, stop2free);
+    sleep_ms(1);
+ 
+    //Turn off pio
+    pio_sm_set_enabled(pio0, sm, false);
+
+
+    //Use board LED as status indicator
+    gpio_init(LED_PIN);
+    gpio_set_dir(LED_PIN, GPIO_OUT);
+
+    gpio_put(LED_PIN, 1);
 
     // Do nothing
     while (true) {
