@@ -119,20 +119,21 @@ int main() {
 
     pwm_set_enabled(0, true);
 
-    // Ramp positive pulses
-    for (int i=0; i<=17; i++) {
-        sleep_ms(1000);
-        delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
-        nextState = (poss2free << 24) | ( delay << 8) | free2poss;
+    while (true) {
+        // Ramp positive pulses
+        for (int i=0; i<=17; i++) {
+            sleep_ms(1000);
+            delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
+            nextState = (poss2free << 24) | ( delay << 8) | free2poss;
+        }
+    
+        // Ramp negative pulses
+        for (int i=0; i<=17; i++) {
+            sleep_ms(1000);
+            delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
+            nextState = (neg2free << 24) | ( delay << 8) | free2neg;
+        }
     }
- 
-    // Ramp negative pulses
-    for (int i=0; i<=17; i++) {
-        sleep_ms(1000);
-        delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
-        nextState = (neg2free << 24) | ( delay << 8) | free2neg;
-    }
-
 
     // Turn off PWM
     pwm_set_enabled(0, false);
