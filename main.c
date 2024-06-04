@@ -24,39 +24,27 @@ uint sm;
 const uint LED_PIN = 25;
 
 
-void stepthru_test(uint sm) {
-    pio_sm_put(pio0, sm, stop2free);
-    
-    busy_wait_ms(1000);
-
-    pwm_set_enabled(0, true);
-
-    pio_sm_put(pio0, sm, free2poss);
-
-}
-
-
 void on_pwm_wrap() {
     pwm_clear_irq(0);
     pio_sm_put(pio0, sm, nextState);
     // // pio0->txf[sm] = nextState; // Same as pio_sm_put without checking
  
-    // Update nextState for next cycle
-    uint32_t delay = 0;
-    if (cycleCount < 100) { // Negative pulses
-        delay = (100-cycleCount)*5; // Delay in PIO cycles @ 25 MHz
-        nextState = negCycle;
-    } else { // Positive pulses
-        delay = (cycleCount-100)*5; // Delay in PIO cycles @ 25 MHz
-        nextState = possCycle;
-    }
+//     // Update nextState for next cycle
+//     uint32_t delay = 0;
+//     if (cycleCount < 100) { // Negative pulses
+//         delay = (100-cycleCount)*5; // Delay in PIO cycles @ 25 MHz
+//         nextState = negCycle;
+//     } else { // Positive pulses
+//         delay = (cycleCount-100)*5; // Delay in PIO cycles @ 25 MHz
+//         nextState = possCycle;
+//     }
  
-    if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
-    if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
-    nextState = nextState | ( delay << 8);
+//     if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
+//     if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
+//     nextState = nextState | ( delay << 8);
  
-    cycleCount++;
-    if (cycleCount > 200) {cycleCount=0;} // Wrap cycle count for test
+//     cycleCount++;
+//     if (cycleCount > 200) {cycleCount=0;} // Wrap cycle count for test
 }
 
 
@@ -119,21 +107,19 @@ int main() {
 
     pwm_set_enabled(0, true);
 
-    while (true) {
-        // Ramp positive pulses
-        for (int i=0; i<=17; i++) {
-            sleep_ms(1000);
-            delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
-            nextState = (poss2free << 24) | ( delay << 8) | free2poss;
-        }
+    // // Ramp positive pulses
+    // for (int i=0; i<=17; i++) {
+    //     sleep_ms(1000);
+    //     delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
+    //     nextState = (poss2free << 24) | ( delay << 8) | free2poss;
+    // }
     
-        // Ramp negative pulses
-        for (int i=0; i<=17; i++) {
-            sleep_ms(1000);
-            delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
-            nextState = (neg2free << 24) | ( delay << 8) | free2neg;
-        }
-    }
+    // // Ramp negative pulses
+    // for (int i=0; i<=17; i++) {
+    //     sleep_ms(1000);
+    //     delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
+    //     nextState = (neg2free << 24) | ( delay << 8) | free2neg;
+    // }
 
     // Turn off PWM
     pwm_set_enabled(0, false);
