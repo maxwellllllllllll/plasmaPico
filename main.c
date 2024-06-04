@@ -99,7 +99,7 @@ int main() {
 
 
     // Turn on SPA in freewheeling state and activate PWM
-    uint32_t delay = 250;
+    uint16_t delay = 250;
     nextState = (stop2free << 24) | (( delay << 8) | free2stop);
     //pio_sm_put(pio0, sm, nextState);
     
