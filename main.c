@@ -18,10 +18,22 @@ uint32_t stop2free, free2stop, free2poss, free2neg, poss2free, neg2free;
 uint32_t freeCycle, possCycle, negCycle;
 uint32_t nextState, cycleCount;
 
+uint16_t delay;
+
 uint sm;
 
 
 const uint LED_PIN = 25;
+
+
+void delay_test(){
+    nextState = freeCycle;
+    pio_sm_put(pio0, sm, nextState);
+
+    nextState = (possCycle) | ( delay << 8 );
+    pio_sm_put(pio0, sm, nextState);
+
+}
 
 
 void on_pwm_wrap() {
@@ -50,7 +62,6 @@ void on_pwm_wrap() {
 
 int main() {
     static const uint startPin = 10;
-    static const float pio_freq = 1;
 
     set_sys_clock_khz(125000, true); //125000
 
@@ -79,7 +90,7 @@ int main() {
     // return with the memory offset of the program.
     uint offset = pio_add_program(pio, &pinsToggle_program);
 
-    // Calculate the PIO clock divider
+    // PIO clock divider
     float div = 5.f; //(float)clock_get_hz(clk_sys) / pio_freq;
 
     // Initialize the program using the helper function in our .pio file
@@ -99,13 +110,18 @@ int main() {
 
 
     // Turn on SPA in freewheeling state and activate PWM
-    uint16_t delay = 250;
+    delay = 250; // largest: 65536
     nextState = (stop2free << 24) | (( delay << 8) | free2stop);
-    //pio_sm_put(pio0, sm, nextState);
+    pio_sm_put(pio0, sm, nextState);
     
-    //busy_wait_ms(1000);
+    busy_wait_ms(1);
 
-    pwm_set_enabled(0, true);
+    delay_test();
+
+    busy_wait_ms(1000);
+
+
+    // pwm_set_enabled(0, true);
 
     // // Ramp positive pulses
     // for (int i=0; i<=17; i++) {
