@@ -39,24 +39,24 @@ void delay_test(){
 void on_pwm_wrap() {
     pwm_clear_irq(0);
     pio_sm_put(pio0, sm, nextState);
-    // // pio0->txf[sm] = nextState; // Same as pio_sm_put without checking
+    // pio0->txf[sm] = nextState; // Same as pio_sm_put without checking
  
-//     // Update nextState for next cycle
-//     uint32_t delay = 0;
-//     if (cycleCount < 100) { // Negative pulses
-//         delay = (100-cycleCount)*5; // Delay in PIO cycles @ 25 MHz
-//         nextState = negCycle;
-//     } else { // Positive pulses
-//         delay = (cycleCount-100)*5; // Delay in PIO cycles @ 25 MHz
-//         nextState = possCycle;
-//     }
+    // Update nextState for next cycle
+    uint32_t delay = 0;
+    if (cycleCount < 100) { // Negative pulses
+        delay = (100-cycleCount)*5; // Delay in PIO cycles @ 25 MHz
+        nextState = negCycle;
+    } else { // Positive pulses
+        delay = (cycleCount-100)*5; // Delay in PIO cycles @ 25 MHz
+        nextState = possCycle;
+    }
  
-//     if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
-//     if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
-//     nextState = nextState | ( delay << 8);
+    if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
+    if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
+    nextState = nextState | ( delay << 8);
  
-//     cycleCount++;
-//     if (cycleCount > 200) {cycleCount=0;} // Wrap cycle count for test
+    cycleCount++;
+    if (cycleCount > 200) {cycleCount=0;} // Wrap cycle count for test
 }
 
 
@@ -113,15 +113,12 @@ int main() {
     delay = 250; // largest: 65536
     nextState = (stop2free << 24) | (( delay << 8) | free2stop);
     pio_sm_put(pio0, sm, nextState);
-    
+
     busy_wait_ms(1);
 
-    delay_test();
+    pwm_set_enabled(0, true);
 
-    busy_wait_ms(1000);
-
-
-    // pwm_set_enabled(0, true);
+    busy_wait_ms(100);
 
     // // Ramp positive pulses
     // for (int i=0; i<=17; i++) {
