@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "pico/stdlib.h"
 #include "pico/time.h"
 #include "hardware/pio.h"
@@ -6,6 +7,8 @@
 
 #include "pinsToggle.pio.h"
 
+#include "pico/malloc.h"
+
 
 // pin "addresses"
 uint32_t S4 = 0x00000008; // 1000
@@ -13,7 +16,7 @@ uint32_t S3 = 0x00000004; // 0100
 uint32_t S2 = 0x00000002; // 0010
 uint32_t S1 = 0x00000001; // 0001
 
-// States
+// Pulse States
 uint32_t stop2free, free2stop, free2poss, free2neg, poss2free, neg2free;
 uint32_t freeCycle, possCycle, negCycle;
 uint32_t nextState, cycleCount;
@@ -22,17 +25,136 @@ uint16_t delay;
 
 uint sm;
 
+// Device States
+int state;
+#define AWAIT_HEADER 1
+#define AWAIT_SYNC 2
+#define BLOCK_FOUND 3
+#define GETTING_BLOCK 4
+
+// Data Block
+unsigned char* block;
+
 
 const uint LED_PIN = 25;
 
 
-void delay_test(){
-    nextState = freeCycle;
-    pio_sm_put(pio0, sm, nextState);
+/*Once a block is detected by scan_for_input(), classifies and
+collects the rest of the block*/
+uint16_t get_block(){
+    char c;
+    
+    char block_length;
+    uint16_t block_length_uint;
+    char cs_received;
+    char trailer_received;
+    uint8_t cs = 0;
 
-    nextState = (possCycle) | ( delay << 8 );
-    pio_sm_put(pio0, sm, nextState);
+    char block_type;
+    #define DATA 0x01
+    #define TRAILER 0x55
+    #define DATA_BLOCK_LENGTH 256
 
+    state = GETTING_BLOCK;
+
+    scanf("%c", &block_type);
+        
+    switch (block_type) {
+        case DATA:
+            //printf("\ngetting data block");
+            scanf("%c", &block_length);
+            block_length_uint = (uint16_t)block_length;
+            //printf("\n %u bl:", block_length_uint);
+
+            block = (unsigned char*)malloc(block_length_uint * sizeof(unsigned char)); // replace with specified length
+            //printf(sizeof(block) / sizeof(block[0]));
+
+            // Builds start of block (already read)
+            // TODO: Move most of this up above switch case
+            block[0] = 0x55;                             // Header
+            block[1] = 0x3C;                             // Sync
+            block[2] = 0x01;                             // Block Type
+            block[3] = block_length;                     // Data Length
+
+            for (uint16_t block_index = 4; block_index < block_length + 4; block_index++){
+                scanf("%c", &c);
+                //printf("\n C: %d", c);
+
+                // adds to block
+                block[block_index] = c;
+
+                // checksum
+                cs += c;
+                //printf("\n cs: %d", cs);
+            }
+
+            // verify checksum
+            scanf("%c", &cs_received);
+            //printf("\n%d", cs_received);
+
+            if (cs != cs_received) {
+                // TODO Error handling
+                printf("CHECKSUM ERROR");
+            }
+            else {
+                //printf("Checksum evaluated successfully");
+            }
+
+            block[block_length + 6 - 2] = cs_received;               // Checksum
+
+            // Trailer
+            scanf("%c", &trailer_received);
+
+            if (trailer_received != TRAILER) {
+                printf("you should never get here");
+            }
+
+            block[block_length + 6 - 1] = TRAILER; // Trailer
+
+            break;
+
+
+        default:
+            // handle this better
+            printf("TYPE ERROR");
+            break;
+    }
+
+    
+    return block_length_uint;
+    
+}
+
+
+/* Continually scans for input. Does not terminate until 
+an input block is received*/
+void scan_for_input(){
+    char in;
+    state = AWAIT_HEADER;
+
+    while ( true ) {
+        scanf("%c", &in);
+        
+        //printf("%d\n", in);
+
+        switch (state) {
+            case AWAIT_HEADER:
+                if (in == 0x55) {
+                    state = AWAIT_SYNC;
+                    //printf("Await header");
+                }
+                break;
+            
+            case AWAIT_SYNC:
+                if (in == 0x3C) {
+                    //printf("await sync");
+                    state = BLOCK_FOUND;
+                    return;
+                }
+            default:
+                break;
+        }
+    }
 }
 
 
@@ -60,7 +182,8 @@ void on_pwm_wrap() {
 }
 
 
-int main() {
+// Split into seperate functions
+void run_pulse() {
     static const uint startPin = 10;
 
     set_sys_clock_khz(125000, true); //125000
@@ -157,4 +280,28 @@ int main() {
     while (true) {
         sleep_ms(1000);
     }
+}
+
+
+int main() {
+    uint16_t block_length;
+
+    stdio_init_all();
+
+    scan_for_input();
+
+    switch (state) {
+        case BLOCK_FOUND:
+            block_length = get_block();
+            break;
+        
+        default:
+            break;
+    }
+
+    for (int i = 0; i <= block_length + 6; i++) {
+        printf("\n%c", block[i]);
+    }
+
+    return 0;
 }
