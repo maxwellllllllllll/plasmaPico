@@ -11,63 +11,69 @@ int state;
 #define BLOCK_FOUND 3
 #define GETTING_BLOCK 4
 
-char* block;
+unsigned char* block;
 
 
 uint16_t get_block(){
     char c;
     
     char block_length;
+    uint16_t block_length_uint;
     char cs_received;
     char trailer_received;
-    uint8_t cs;
+    uint8_t cs = 0;
 
     char block_type;
     #define DATA 0x01
     #define TRAILER 0x55
+    #define DATA_BLOCK_LENGTH 256
 
     state = GETTING_BLOCK;
 
     scanf("%c", &block_type);
-
-    printf("\n%d", block_type);
         
     switch (block_type) {
         case DATA:
-            printf("getting data block");
+            //printf("\ngetting data block");
             scanf("%c", &block_length);
+            block_length_uint = (uint16_t)block_length;
+            //printf("\n %u bl:", block_length_uint);
 
-            block = (char*)malloc(block_length * sizeof(char));
+            block = (unsigned char*)malloc(block_length_uint * sizeof(unsigned char)); // this is way better but noooooooo we have to allocate runtime resournces :(
+            //printf(sizeof(block) / sizeof(block[0]));
 
             // Builds start of block (already read)
             // TODO: Move most of this up above switch case
             block[0] = 0x55;                             // Header
             block[1] = 0x3C;                             // Sync
             block[2] = 0x01;                             // Block Type
-            block[3] = block_length;                     // Block Length
+            block[3] = block_length;                     // Data Length
 
-            for (uint16_t block_index = 4; block_index <= block_length - 3; block_index++){
+            for (uint16_t block_index = 4; block_index < block_length + 4; block_index++){
                 scanf("%c", &c);
+                //printf("\n C: %d", c);
 
                 // adds to block
                 block[block_index] = c;
 
                 // checksum
                 cs += c;
+                //printf("\n cs: %d", cs);
             }
 
             // verify checksum
             scanf("%c", &cs_received);
+            //printf("\n%d", cs_received);
 
             if (cs != cs_received) {
                 // TODO Error handling
                 printf("CHECKSUM ERROR");
             }
             else {
-                printf("Checksum evaluated successfully");
+                //printf("Checksum evaluated successfully");
             }
 
-            block[block_length + 6 - 2] = cs;               // Checksum
+            block[block_length + 6 - 2] = cs_received;               // Checksum
 
             // Trailer
             scanf("%c", &trailer_received);
@@ -76,7 +82,7 @@ uint16_t get_block(){
                 printf("you should never get here");
             }
 
-            block[block_length + 6 - 1] = trailer_received; // Trailer
+            block[block_length + 6 - 1] = TRAILER; // Trailer
 
             break;
 
@@ -84,9 +90,10 @@ uint16_t get_block(){
         default:
             // handle this better
             printf("TYPE ERROR");
+            break;
     }
 
-    uint16_t block_length_uint = block_length - '0';
+    
     return block_length_uint;
     
 }
@@ -99,19 +106,19 @@ void scan_for_input(){
     while ( true ) {
         scanf("%c", &in);
         
-        printf("%d\n", in);
+        //printf("%d\n", in);
 
         switch (state) {
             case AWAIT_HEADER:
                 if (in == 0x55) {
                     state = AWAIT_SYNC;
-                    printf("Await header");
+                    //printf("Await header");
                 }
                 break;
             
             case AWAIT_SYNC:
                 if (in == 0x3C) {
-                    printf("await sync");
+                    //printf("await sync");
                     state = BLOCK_FOUND;
                     return;
                 }
@@ -165,8 +172,8 @@ int main() {
             break;
     }
 
-    for (int i = 0; i <= block_length; i++) {
-        printf("%c", block[i]);
+    for (int i = 0; i <= block_length + 6; i++) {
+        printf("\n%c", block[i]);
     }
 
     return 0;

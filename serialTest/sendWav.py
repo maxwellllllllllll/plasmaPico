@@ -4,10 +4,10 @@ def buildDataBlock(mybytes: bytes):
     length = len(mybytes)
     out = bytearray(length + 6)
 
-    out[0] = 0x55             # Head
-    out[1] = 0x3C             # Sync
-    out[2] = 0x01             # Block Type
-    out[3] = length           # Data Length
+    out[0] = 0x55               # Head
+    out[1] = 0x3C               # Sync
+    out[2] = 0x01               # Block Type
+    out[3] = length             # Data Length
 
     # Set data
     for i in range(0, length):
@@ -43,7 +43,7 @@ def serialInit():
 
 ser = serialInit()
 
-listVals = [0x55, 0x3C, 0x01, 0x07, 0x02, 0x02, 0x55] #
+listVals = [0x55, 0x3C, 0x01, 0x02, 0x02, 0x01, 0x03, 0x55] #
 
 byteVals = bytearray(listVals)
 
@@ -58,3 +58,10 @@ print(ser.readline())
 print(ser.readline())
 print(ser.readline())
 print(ser.readline())
+print(ser.readline())
+print(ser.readline())
+print(ser.readline())
+print(ser.readline())
+
+ser.close()
+print("here")
