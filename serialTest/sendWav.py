@@ -1,9 +1,7 @@
 import serial
-import time
 
-
-def buildDataBlock(bytes):
-    length = len(bytes)
+def buildDataBlock(mybytes: bytes):
+    length = len(mybytes)
     out = bytearray(length + 6)
 
     out[0] = 0x55             # Head
@@ -13,7 +11,7 @@ def buildDataBlock(bytes):
 
     # Set data
     for i in range(0, length):
-        out[i+4] = bytes[i]
+        out[i+4] = mybytes[i]
     
     # Compute checksum
     cs = 0
@@ -45,16 +43,18 @@ def serialInit():
 
 ser = serialInit()
 
-longList = makeList(200)
+listVals = [0x55, 0x3C, 0x01, 0x07, 0x02, 0x02, 0x55] #
 
-intVal = 1
+byteVals = bytearray(listVals)
 
-byteVal = intVal.to_bytes(1, 'little')
+packet = bytearray()
 
-writeVal = byteVal
+packet.append(0x55)
 
-print(writeVal, '\n')
+ser.write(byteVals)
 
-ser.write(writeVal)
-
+print(ser.readline())
+print(ser.readline())
+print(ser.readline())
+print(ser.readline())
 print(ser.readline())
