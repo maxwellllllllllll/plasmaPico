@@ -68,15 +68,16 @@ uint16_t get_block(){
 
             block = (unsigned char*)malloc(block_length_uint * sizeof(unsigned char)); // replace with specified length
             //printf(sizeof(block) / sizeof(block[0]));
+            // Note: length of data for 200ms is 10,000 delays (bytes)
 
-            // Builds start of block (already read)
-            // TODO: Move most of this up above switch case
-            block[0] = 0x55;                             // Header
-            block[1] = 0x3C;                             // Sync
-            block[2] = 0x01;                             // Block Type
-            block[3] = block_length;                     // Data Length
+            // // Builds start of block (already read)
+            // // not needed
+            // block[0] = 0x55;                             // Header
+            // block[1] = 0x3C;                             // Sync
+            // block[2] = 0x01;                             // Block Type
+            // block[3] = block_length;                     // Data Length
 
-            for (uint16_t block_index = 4; block_index < block_length + 4; block_index++){
+            for (uint16_t block_index = 0; block_index < block_length; block_index++){
                 scanf("%c", &c);
                 //printf("\n C: %d", c);
 
@@ -97,10 +98,10 @@ uint16_t get_block(){
                 printf("CHECKSUM ERROR");
             }
             else {
-                //printf("Checksum evaluated successfully");
+                printf("Checksum evaluated successfully");
             }
 
-            block[block_length + 6 - 2] = cs_received;               // Checksum
+            // block[block_length + 6 - 2] = cs_received;               // Checksum
 
             // Trailer
             scanf("%c", &trailer_received);
@@ -109,7 +110,7 @@ uint16_t get_block(){
                 printf("you should never get here");
             }
 
-            block[block_length + 6 - 1] = TRAILER; // Trailer
+            // block[block_length + 6 - 1] = TRAILER; // Trailer
 
             break;
 
@@ -299,9 +300,11 @@ int main() {
             break;
     }
 
-    for (int i = 0; i <= block_length + 6; i++) {
-        printf("\n%c", block[i]);
-    }
+    // for (int i = 0; i <= block_length; i++) {
+    //     printf("\n%c", block[i]);
+    // }
+
+    run_pulse();
 
     return 0;
 }

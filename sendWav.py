@@ -1,7 +1,7 @@
 import serial
 
-def buildDataBlock(mybytes: bytes):
-    length = len(mybytes)
+def buildTransferBlock(dataBytes: bytearray):
+    length = len(dataBytes)
     out = bytearray(length + 6)
 
     out[0] = 0x55               # Head
@@ -11,7 +11,7 @@ def buildDataBlock(mybytes: bytes):
 
     # Set data
     for i in range(0, length):
-        out[i+4] = mybytes[i]
+        out[i+4] = dataBytes[i]
     
     # Compute checksum
     cs = 0
@@ -40,10 +40,31 @@ def serialInit():
 
     return ser
 
+def buildTestDataBlock():
+    blockLength = 255 # 10,000
+    dataBytes = bytearray()
+
+    j = 0
+    flip = False
+    for i in range(blockLength):
+        dataBytes.append(j)
+
+        if flip == False:
+            j += 1
+        elif flip == True:
+            j -= 1
+        
+        if j == 255:
+            flip = True
+        elif j == 0:
+            flip = False
+    
+    return dataBytes
+
 
 ser = serialInit()
 
-listVals = [0x55, 0x3C, 0x01, 0x02, 0x02, 0x01, 0x03, 0x55] #
+listVals = [0x55, 0x3C, 0x01, 0x02, 0x02, 0x01, 0x03, 0x55] # Head, Sync, Type, Length, [data], cs, trailer
 
 byteVals = bytearray(listVals)
 
@@ -51,17 +72,15 @@ packet = bytearray()
 
 packet.append(0x55)
 
-ser.write(byteVals)
+dataBytes = buildTestDataBlock()
+
+transferBlock = buildTransferBlock(dataBytes)
+
+ser.write(transferBlock)
 
 print(ser.readline())
 print(ser.readline())
-print(ser.readline())
-print(ser.readline())
-print(ser.readline())
-print(ser.readline())
-print(ser.readline())
-print(ser.readline())
-print(ser.readline())
+
 
 ser.close()
 print("here")
