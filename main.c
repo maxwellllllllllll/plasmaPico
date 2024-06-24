@@ -185,7 +185,7 @@ void on_pwm_wrap() {
         nextState = possCycle;
     }
  
-    if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
+    if (delay < 25) {nextState = freeCycle; delay = 25;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
     if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
     nextState = nextState | ( delay << 8);
  
