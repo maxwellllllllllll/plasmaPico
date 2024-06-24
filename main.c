@@ -163,14 +163,25 @@ void on_pwm_wrap() {
     pwm_clear_irq(0);
     pio_sm_put(pio0, sm, nextState);
     // pio0->txf[sm] = nextState; // Same as pio_sm_put without checking
+
+    // Calculates delay from data block
+    uint8_t elem = block[cycleCount]; //block must be of the correct length TODO: fix
+    
+    if (elem <= 100) {
+        delay = elem * 5;
+    }
+
+    else if (elem > 100) {
+        delay = (elem - 100) * 5;
+    }
+    
  
     // Update nextState for next cycle
-    uint32_t delay = 0;
-    if (cycleCount < 100) { // Negative pulses
-        delay = (100-cycleCount)*5; // Delay in PIO cycles @ 25 MHz
+    if (block[cycleCount] < 100) { // Negative pulses
+        //delay = (100-cycleCount)*5; // Delay in PIO cycles @ 25 MHz
         nextState = negCycle;
     } else { // Positive pulses
-        delay = (cycleCount-100)*5; // Delay in PIO cycles @ 25 MHz
+        //delay = (cycleCount-100)*5; // Delay in PIO cycles @ 25 MHz
         nextState = possCycle;
     }
  
@@ -179,7 +190,7 @@ void on_pwm_wrap() {
     nextState = nextState | ( delay << 8);
  
     cycleCount++;
-    if (cycleCount > 200) {cycleCount=0;} // Wrap cycle count for test
+    //if (cycleCount > 200) {cycleCount=0;} // Wrap cycle count for test
 }
 
 

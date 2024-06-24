@@ -54,7 +54,7 @@ def buildTestDataBlock():
         elif flip == True:
             j -= 1
         
-        if j == 255:
+        if j == 200:
             flip = True
         elif j == 0:
             flip = False
