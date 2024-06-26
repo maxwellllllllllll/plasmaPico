@@ -173,11 +173,11 @@ void on_pwm_wrap() {
     // Calculates delay from data block
     uint8_t elem = block[cycleCount]; //block must be of the correct length TODO: fix
     
-    if (elem <= 100) {
+    if (elem < 100) {
         delay = elem * 5;
     }
 
-    else if (elem > 100) {
+    else if (elem >= 100) {
         delay = (elem - 100) * 5;
     }
     
