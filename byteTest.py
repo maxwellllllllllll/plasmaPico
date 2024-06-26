@@ -1,20 +1,7 @@
-blockLength = 10000 # 10,000
-dataBytes = bytearray()
+import serial
 
-j = 0
-flip = False
-for i in range(blockLength):
-    dataBytes.append(j)
+ser = serial.Serial('COM3', 9600, timeout=1, bytesize=8, parity='N', stopbits=1)
 
-    if flip == False:
-        j += 1
-    elif flip == True:
-        j -= 1
-    
-    if j == 255:
-        flip = True
-    elif j == 0:
-        flip = False
-
-for k in range(len(dataBytes)):
-    print(dataBytes[k])
+print(ser.readline())
+print(ser.readline())
+print(ser.readline())

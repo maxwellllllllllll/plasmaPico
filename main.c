@@ -44,7 +44,8 @@ collects the rest of the block*/
 uint16_t get_block(){
     char c;
     
-    char block_length;
+    char block_length1;
+    char block_length2;
     uint16_t block_length_uint;
     char cs_received;
     char trailer_received;
@@ -62,7 +63,11 @@ uint16_t get_block(){
     switch (block_type) {
         case DATA:
             //printf("\ngetting data block");
-            scanf("%c", &block_length);
+            scanf("%c", &block_length1);
+            scanf("%c", &block_length2);
+
+            int block_length = (block_length2 << 8) | block_length1;
+            printf("\nbl: %d\n", block_length);
             block_length_uint = (uint16_t)block_length;
             //printf("\n %u bl:", block_length_uint);
 
@@ -91,7 +96,7 @@ uint16_t get_block(){
 
             // verify checksum
             scanf("%c", &cs_received);
-            //printf("\n%d", cs_received);
+            printf("cs: %d, csr: %d\n", cs, cs_received);
 
             if (cs != cs_received) {
                 // TODO Error handling
@@ -105,12 +110,13 @@ uint16_t get_block(){
 
             // Trailer
             scanf("%c", &trailer_received);
+            printf("\n%d", trailer_received);
 
             if (trailer_received != TRAILER) {
-                printf("you should never get here");
+                printf("\nyou should never get here");
             }
 
-            // block[block_length + 6 - 1] = TRAILER; // Trailer
+            // block[block_length + 6 - 1] = TRAILER; // Trailer`
 
             break;
 
@@ -142,13 +148,13 @@ void scan_for_input(){
             case AWAIT_HEADER:
                 if (in == 0x55) {
                     state = AWAIT_SYNC;
-                    //printf("Await header");
+                    printf("Await header");
                 }
                 break;
             
             case AWAIT_SYNC:
                 if (in == 0x3C) {
-                    //printf("await sync");
+                    printf("await sync");
                     state = BLOCK_FOUND;
                     return;
                 }
@@ -185,7 +191,7 @@ void on_pwm_wrap() {
         nextState = possCycle;
     }
  
-    if (delay < 25) {nextState = freeCycle; delay = 25;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
+    if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
     if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
     nextState = nextState | ( delay << 8);
  
@@ -253,7 +259,7 @@ void run_pulse() {
 
     pwm_set_enabled(0, true);
 
-    busy_wait_ms(100);
+    busy_wait_ms(200);
 
     // // Ramp positive pulses
     // for (int i=0; i<=17; i++) {

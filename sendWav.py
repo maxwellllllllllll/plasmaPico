@@ -1,26 +1,30 @@
 import serial
+import math
 
 def buildTransferBlock(dataBytes: bytearray):
     length = len(dataBytes)
-    out = bytearray(length + 6)
+    print(length)
+    out = bytearray(length + 7)
 
-    out[0] = 0x55               # Head
-    out[1] = 0x3C               # Sync
-    out[2] = 0x01               # Block Type
-    out[3] = length             # Data Length
+
+    out[0] = 0x55                                              # Head
+    out[1] = 0x3C                                              # Sync
+    out[2] = 0x01                                              # Block Type
+    out[3] = length.to_bytes(2, 'little')[0]                   # Data Length First Byte
+    out[4] = length.to_bytes(2, 'little')[1]                   # Data Length Second Byte
 
     # Set data
-    for i in range(0, length):
-        out[i+4] = dataBytes[i]
+    for i in range(0, length-1): #remove the -1
+        out[i+5] = dataBytes[i]                                # Data
     
     # Compute checksum
     cs = 0
-    for i in range(2, length + 6 - 2):
+    for i in range(5, length + 7 - 2):
         cs += out[i]
     cs &= 0xFF
 
-    out[length + 6 - 2] = cs    # Checksum
-    out[length + 6 - 1] = 0x55  # Trailer
+    out[length + 7 - 2] = cs                                   # Checksum
+    out[length + 7 - 1] = 0x55                                 # Trailer
 
     return out
 
@@ -41,18 +45,18 @@ def serialInit():
     return ser
 
 def buildTestDataBlock():
-    blockLength = 255 # 10,000
+    blockLength = 10000 # 10,000
     dataBytes = bytearray()
 
     j = 0
     flip = False
     for i in range(blockLength):
-        dataBytes.append(j)
+        dataBytes.append(math.floor(j))
 
         if flip == False:
-            j += 1
+            j += 0.5
         elif flip == True:
-            j -= 1
+            j -= 0.5
         
         if j == 200:
             flip = True
@@ -76,11 +80,16 @@ dataBytes = buildTestDataBlock()
 
 transferBlock = buildTransferBlock(dataBytes)
 
+print("sending...")
+
 ser.write(transferBlock)
 
 print(ser.readline())
 print(ser.readline())
-
+print(ser.readline())
+print(ser.readline())
+print(ser.readline())
+print(ser.readline())
 
 ser.close()
 print("here")
