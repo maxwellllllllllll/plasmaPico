@@ -14,7 +14,7 @@ def buildTransferBlock(dataBytes: bytearray):
     out[4] = length.to_bytes(2, 'little')[1]                   # Data Length Second Byte
 
     # Set data
-    for i in range(0, length-1): #remove the -1
+    for i in range(0, length): #remove the -1
         out[i+5] = dataBytes[i]                                # Data
     
     # Compute checksum
@@ -79,8 +79,6 @@ packet.append(0x55)
 dataBytes = buildTestDataBlock()
 
 transferBlock = buildTransferBlock(dataBytes)
-
-print("sending...")
 
 ser.write(transferBlock)
 

@@ -25,6 +25,8 @@ uint16_t delay;
 
 uint sm;
 
+uint8_t target;
+
 // Device States
 int state;
 #define AWAIT_HEADER 1
@@ -34,6 +36,10 @@ int state;
 
 // Data Block
 unsigned char* block;
+
+
+// For PWM Sync
+bool pwm_flag = 0;
 
 
 const uint LED_PIN = 25;
@@ -167,23 +173,24 @@ void scan_for_input(){
 
 void on_pwm_wrap() {
     pwm_clear_irq(0);
-    pio_sm_put(pio0, sm, nextState);
     // pio0->txf[sm] = nextState; // Same as pio_sm_put without checking
 
-    // Calculates delay from data block
-    uint8_t elem = block[cycleCount]; //block must be of the correct length TODO: fix
-    
-    if (elem < 100) {
-        delay = elem * 5;
-    }
+    // printf("blah");
 
-    else if (elem >= 100) {
-        delay = (elem - 100) * 5;
-    }
+    // // Calculates delay from data block
+    // uint8_t elem = temp;//block[cycleCount]; //block must be of the correct length TODO: fix
+    
+    // if (elem < 100) {
+    //     delay = elem * 5;
+    // }
+
+    // else if (elem >= 100) {
+    //     delay = (elem - 100) * 5;
+    // }
     
  
     // Update nextState for next cycle
-    if (block[cycleCount] < 100) { // Negative pulses
+    if (target < 100) { // Negative pulses
         //delay = (100-cycleCount)*5; // Delay in PIO cycles @ 25 MHz
         nextState = negCycle;
     } else { // Positive pulses
@@ -194,14 +201,17 @@ void on_pwm_wrap() {
     if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
     if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
     nextState = nextState | ( delay << 8);
+
+    pio_sm_put(pio0, sm, nextState);
+
+    pwm_flag = 1;
  
     cycleCount++;
     //if (cycleCount > 200) {cycleCount=0;} // Wrap cycle count for test
 }
 
 
-// Split into seperate functions
-void run_pulse() {
+void init_pulse() {
     static const uint startPin = 10;
 
     set_sys_clock_khz(125000, true); //125000
@@ -220,6 +230,7 @@ void run_pulse() {
     negCycle = (neg2free << 24) | free2neg;
  
     cycleCount = 0;
+
 
     // Choose PIO instance (0 or 1)
     PIO pio = pio0;
@@ -248,32 +259,10 @@ void run_pulse() {
     pwm_config_set_clkdiv(&config, div); // Use system clock frequency (25 MHz)
     pwm_config_set_wrap(&config, 499);   // Wrap every 20 us (0-499)
     pwm_init(0, &config, false);
+}
 
 
-    // Turn on SPA in freewheeling state and activate PWM
-    delay = 250; // largest: 65536
-    nextState = (stop2free << 24) | (( delay << 8) | free2stop);
-    pio_sm_put(pio0, sm, nextState);
-
-    busy_wait_ms(1);
-
-    pwm_set_enabled(0, true);
-
-    busy_wait_ms(200);
-
-    // // Ramp positive pulses
-    // for (int i=0; i<=17; i++) {
-    //     sleep_ms(1000);
-    //     delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
-    //     nextState = (poss2free << 24) | ( delay << 8) | free2poss;
-    // }
-    
-    // // Ramp negative pulses
-    // for (int i=0; i<=17; i++) {
-    //     sleep_ms(1000);
-    //     delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
-    //     nextState = (neg2free << 24) | ( delay << 8) | free2neg;
-    // }
+void shutdown_pulse() {
 
     // Turn off PWM
     pwm_set_enabled(0, false);
@@ -293,6 +282,62 @@ void run_pulse() {
     gpio_set_dir(LED_PIN, GPIO_OUT);
 
     gpio_put(LED_PIN, 1);
+}
+
+
+// Split into seperate functions
+void run_pulse(uint16_t block_length_uint) {
+    uint8_t *buffer;
+    uint16_t comp_target;
+
+    init_pulse();    
+
+
+    // Turn on SPA in freewheeling state and activate PWM
+    delay = 250; // largest: 65536
+    nextState = (stop2free << 24) | (( delay << 8) | free2stop);
+    pio_sm_put(pio0, sm, nextState);
+
+    busy_wait_ms(1);
+
+    pwm_set_enabled(0, true);
+
+    for (uint16_t cycle = 0; cycle <= block_length_uint; cycle++) {
+        // Target coil voltage
+        target = block[cycle];
+
+        //TODO: put ADC sampling and PID algorythm here
+
+        if (target < 100) {
+            comp_target = target * 5;
+        }
+
+        else if (target >= 100) {
+            comp_target = (target - 100) * 5;
+        }
+        
+        //google atomic operations
+        while (true){
+            if (pwm_flag == 1) {delay = comp_target; pwm_flag = 0; break;}
+        }
+    }
+
+
+    // // Ramp positive pulses
+    // for (int i=0; i<=17; i++) {
+    //     sleep_ms(1000);
+    //     delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
+    //     nextState = (poss2free << 24) | ( delay << 8) | free2poss;
+    // }
+    
+    // // Ramp negative pulses
+    // for (int i=0; i<=17; i++) {
+    //     sleep_ms(1000);
+    //     delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
+    //     nextState = (neg2free << 24) | ( delay << 8) | free2neg;
+    // }
+
+    shutdown_pulse();
 
     // Do nothing
     while (true) {
@@ -302,15 +347,14 @@ void run_pulse() {
 
 
 int main() {
-    uint16_t block_length;
+    uint16_t block_length_uint;
 
     stdio_init_all();
-
     scan_for_input();
 
     switch (state) {
         case BLOCK_FOUND:
-            block_length = get_block();
+            block_length_uint = get_block();
             break;
         
         default:
@@ -321,7 +365,7 @@ int main() {
     //     printf("\n%c", block[i]);
     // }
 
-    run_pulse();
+    run_pulse(block_length_uint);
 
     return 0;
 }
