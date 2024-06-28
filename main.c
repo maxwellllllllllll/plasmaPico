@@ -36,6 +36,8 @@ int state;
 
 // Data Block
 unsigned char* block;
+// Contains uint 0-200 delay values output to pio (TODO: make this more clear)
+unsigned char* gpio_block;
 
 
 // For PWM Sync
@@ -43,6 +45,7 @@ bool pwm_flag = 0;
 
 
 const uint LED_PIN = 25;
+const uint TRIGGER_PIN = 2;
 
 
 /*Once a block is detected by scan_for_input(), classifies and
@@ -78,6 +81,7 @@ uint16_t get_block(){
             //printf("\n %u bl:", block_length_uint);
 
             block = (unsigned char*)malloc(block_length_uint * sizeof(unsigned char)); // replace with specified length
+            gpio_block = (unsigned char*)malloc((block_length_uint + 7) * sizeof(unsigned char)); // for use later
             //printf(sizeof(block) / sizeof(block[0]));
             // Note: length of data for 200ms is 10,000 delays (bytes)
 
@@ -288,17 +292,23 @@ void shutdown_pulse() {
 // Split into seperate functions
 void run_pulse(uint16_t block_length_uint) {
     uint8_t *buffer;
-    uint16_t comp_target;
+    uint16_t scale_target;
 
+    // Initializes pwm
     init_pulse();    
 
+    // Initializes trigger pin
+    gpio_init(LED_PIN);
+    gpio_set_dir(LED_PIN, GPIO_IN);
 
     // Turn on SPA in freewheeling state and activate PWM
-    delay = 250; // largest: 65536
+    delay = 250;
     nextState = (stop2free << 24) | (( delay << 8) | free2stop);
     pio_sm_put(pio0, sm, nextState);
 
-    busy_wait_ms(1);
+    // Waits until trigger pin is flipped
+    while (true) {if (gpio_get(TRIGGER_PIN) == 1) {break;}}
+
 
     pwm_set_enabled(0, true);
 
@@ -308,17 +318,19 @@ void run_pulse(uint16_t block_length_uint) {
 
         //TODO: put ADC sampling and PID algorythm here
 
+        gpio_block[cycle + 5] = target;
+
         if (target < 100) {
-            comp_target = target * 5;
+            scale_target = target * 5;
         }
 
         else if (target >= 100) {
-            comp_target = (target - 100) * 5;
+            scale_target = (target - 100) * 5;
         }
         
         //google atomic operations
         while (true){
-            if (pwm_flag == 1) {delay = comp_target; pwm_flag = 0; break;}
+            if (pwm_flag == 1) {delay = scale_target; pwm_flag = 0; break;}
         }
     }
 
@@ -343,6 +355,17 @@ void run_pulse(uint16_t block_length_uint) {
     while (true) {
         sleep_ms(1000);
     }
+}
+
+
+void return_block() {
+    // Return GPIO Block
+    // Build GPIO Block
+    gpio_block[0] = 0x55;     // Head
+    gpio_block[1] = 0x3C;     // Sync
+    gpio_block[2] = 0x02;     // Block Type (GPIO Result)
+    gpio_block[3] = 0;        // Data Length First Byte
+    gpio_block[4] = 0x55;     // Data Length Second Byte
 }
 
 

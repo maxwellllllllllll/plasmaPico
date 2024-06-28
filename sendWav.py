@@ -9,7 +9,7 @@ def buildTransferBlock(dataBytes: bytearray):
 
     out[0] = 0x55                                              # Head
     out[1] = 0x3C                                              # Sync
-    out[2] = 0x01                                              # Block Type
+    out[2] = 0x01                                              # Block Type (Data Block (TODO: Change name))
     out[3] = length.to_bytes(2, 'little')[0]                   # Data Length First Byte
     out[4] = length.to_bytes(2, 'little')[1]                   # Data Length Second Byte
 
