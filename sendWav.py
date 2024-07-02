@@ -72,22 +72,15 @@ listVals = [0x55, 0x3C, 0x01, 0x02, 0x02, 0x01, 0x03, 0x55] # Head, Sync, Type, 
 
 byteVals = bytearray(listVals)
 
-packet = bytearray()
-
-packet.append(0x55)
-
 dataBytes = buildTestDataBlock()
 
 transferBlock = buildTransferBlock(dataBytes)
 
 ser.write(transferBlock)
 
-print(ser.readline())
-print(ser.readline())
-print(ser.readline())
-print(ser.readline())
-print(ser.readline())
-print(ser.readline())
+while True:
+    print(ser.readline())
+
 
 ser.close()
 print("here")

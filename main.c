@@ -38,6 +38,7 @@ int state;
 unsigned char* block;
 // Contains uint 0-200 delay values output to pio (TODO: make this more clear)
 unsigned char* gpio_block;
+uint8_t gpio_block_cs;
 
 
 // For PWM Sync
@@ -50,6 +51,7 @@ const uint TRIGGER_PIN = 2;
 
 /*Once a block is detected by scan_for_input(), classifies and
 collects the rest of the block*/
+// TODO: Rewrite me to use terminator stuff!!
 uint16_t get_block(){
     char c;
     
@@ -319,6 +321,8 @@ void run_pulse(uint16_t block_length_uint) {
         //TODO: put ADC sampling and PID algorythm here
 
         gpio_block[cycle + 5] = target;
+        //printf("\nCycle: %u, Block: %u", cycle, gpio_block[cycle + 5]);
+        gpio_block_cs += target;
 
         if (target < 100) {
             scale_target = target * 5;
@@ -350,27 +354,34 @@ void run_pulse(uint16_t block_length_uint) {
     // }
 
     shutdown_pulse();
-
-    // Do nothing
-    while (true) {
-        sleep_ms(1000);
-    }
 }
 
 
-void return_block() {
+void build_return_block(uint16_t block_length_uint) {
     // Return GPIO Block
     // Build GPIO Block
-    gpio_block[0] = 0x55;     // Head
-    gpio_block[1] = 0x3C;     // Sync
-    gpio_block[2] = 0x02;     // Block Type (GPIO Result)
-    gpio_block[3] = 0;        // Data Length First Byte
-    gpio_block[4] = 0x55;     // Data Length Second Byte
+    gpio_block[0] = 0x55;                                // Head
+    gpio_block[1] = 0x3C;                                // Sync
+    gpio_block[2] = 0x02;                                // Block Type (GPIO Result)
+    gpio_block[3] = 0x00;                                // Data Length First Byte
+    gpio_block[4] = 0x00;                                // Data Length Second Byte
+    // GPIO Data
+    gpio_block[block_length_uint+1] = gpio_block_cs;     // Checksum
+    gpio_block[block_length_uint+2] = 0x55;              // Trailer
+}
+
+
+void send_block(uint16_t block_length_uint) {
+    for (int i=0; i < (block_length_uint + 7); i++) {
+        printf("\nRX: %u", gpio_block[i]);
+    }
+    printf("done.");
 }
 
 
 int main() {
     uint16_t block_length_uint;
+    int length; // very temp plz
 
     stdio_init_all();
     scan_for_input();
@@ -389,6 +400,11 @@ int main() {
     // }
 
     run_pulse(block_length_uint);
+
+    build_return_block(block_length_uint);
+
+    send_block(block_length_uint);
+
 
     return 0;
 }
