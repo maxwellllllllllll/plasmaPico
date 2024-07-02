@@ -4,6 +4,7 @@
 #include "hardware/pio.h"
 #include "hardware/pwm.h"
 #include "hardware/clocks.h"
+#include "hardware/adc.h"
 
 #include "pinsToggle.pio.h"
 
@@ -40,6 +41,9 @@ unsigned char* block;
 unsigned char* gpio_block;
 uint8_t gpio_block_cs;
 
+//ADC Block
+uint16_t* adc_block;
+
 
 // For PWM Sync
 bool pwm_flag = 0;
@@ -47,6 +51,14 @@ bool pwm_flag = 0;
 
 const uint LED_PIN = 25;
 const uint TRIGGER_PIN = 2;
+
+
+/*Initializes all nescessary memory arrays with sizes defined at runtime*/
+void mem_init(uint16_t block_length){
+    block = (unsigned char*)malloc(block_length * sizeof(unsigned char)); // replace with specified length
+    adc_block = (unsigned int*)malloc(block_length * sizeof(unsigned int)); // for use later NOTE: Make sure using int instead of char works
+    gpio_block = (unsigned char*)malloc((block_length + 7) * sizeof(unsigned char)); // for use later
+}
 
 
 /*Once a block is detected by scan_for_input(), classifies and
@@ -82,8 +94,8 @@ uint16_t get_block(){
             block_length_uint = (uint16_t)block_length;
             //printf("\n %u bl:", block_length_uint);
 
-            block = (unsigned char*)malloc(block_length_uint * sizeof(unsigned char)); // replace with specified length
-            gpio_block = (unsigned char*)malloc((block_length_uint + 7) * sizeof(unsigned char)); // for use later
+            mem_init(block_length_uint);
+
             //printf(sizeof(block) / sizeof(block[0]));
             // Note: length of data for 200ms is 10,000 delays (bytes)
 
@@ -217,6 +229,14 @@ void on_pwm_wrap() {
 }
 
 
+uint16_t adc_sample() {
+    uint16_t result = adc_read();
+    //printf("\nADC: %u", result);
+
+    return result;
+}
+
+
 void init_pulse() {
     static const uint startPin = 10;
 
@@ -265,6 +285,15 @@ void init_pulse() {
     pwm_config_set_clkdiv(&config, div); // Use system clock frequency (25 MHz)
     pwm_config_set_wrap(&config, 499);   // Wrap every 20 us (0-499)
     pwm_init(0, &config, false);
+
+
+    // Setting up ADC
+    adc_init();
+
+    // Make sure GPIO is high-impedance, no pullups etc
+    adc_gpio_init(26);
+    // Select ADC input 0 (GPIO26)
+    adc_select_input(0);
 }
 
 
@@ -295,6 +324,7 @@ void shutdown_pulse() {
 void run_pulse(uint16_t block_length_uint) {
     uint8_t *buffer;
     uint16_t scale_target;
+    uint16_t adc;
 
     // Initializes pwm
     init_pulse();    
@@ -319,6 +349,9 @@ void run_pulse(uint16_t block_length_uint) {
         target = block[cycle];
 
         //TODO: put ADC sampling and PID algorythm here
+        const float conversion_factor = 3.3f / (1 << 12);
+        adc = adc_sample();
+        printf("\nADC: %u, %f", adc, adc* conversion_factor);
 
         gpio_block[cycle + 5] = target;
         //printf("\nCycle: %u, Block: %u", cycle, gpio_block[cycle + 5]);
@@ -403,6 +436,7 @@ int main() {
 
     build_return_block(block_length_uint);
 
+    busy_wait_ms(1000); //DELETE MEEEEEEE
     send_block(block_length_uint);
 
 
