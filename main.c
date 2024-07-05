@@ -278,7 +278,7 @@ void on_pwm_wrap() {
     // printf("blah");
 
     // // Calculates delay from data block
-    //target = block[cycleCount]; //block must be of the correct length TODO: fix
+    target = block[cycleCount]; //block must be of the correct length TODO: fix
     
     if (target < 100) {
         delay = target * 5;
