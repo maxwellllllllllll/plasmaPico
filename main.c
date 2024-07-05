@@ -28,6 +28,8 @@ uint sm;
 
 uint8_t target;
 
+int flag_track = 0;
+
 // Device States
 int state;
 #define AWAIT_HEADER 1
@@ -42,15 +44,95 @@ unsigned char* gpio_block;
 uint8_t gpio_block_cs;
 
 //ADC Block
-uint16_t* adc_block;
+unsigned int* adc_block;
 
 
 // For PWM Sync
-bool pwm_flag = 0;
+int pwm_flag = 0;
 
 
 const uint LED_PIN = 25;
 const uint TRIGGER_PIN = 2;
+
+
+typedef struct {
+
+    /* Controller Gains */
+    float Kp;
+    float Ki;
+    float Kd;
+
+    /* Derivative low-pass filter time constant */
+    float tau;
+
+    /* Output limits */
+    float limMin;
+    float limMax;
+
+    /* Integrator limits */
+    float limMinInt;
+    float limMaxInt;
+
+    /* Sample time (s)*/
+    float T;
+
+    /* Controller "memory" */
+    float integrator;
+    float prevError;        // for integrator
+    float differentiator;
+    float prevMeasurement;  // for differentiator
+
+    /* Controller output */
+    float out;
+
+} pid_controller;
+
+
+void pid_controller_init(pid_controller *pid) {
+
+    // Clear controller variables
+    pid->integrator = 0.0f;
+    pid->prevError = 0.0f;
+
+    pid->differentiator = 0.0f;
+    pid->prevMeasurement = 0.0f;
+
+    pid->out = 0.0f;
+}
+
+
+float pid_controller_update(pid_controller *pid, float setpoint, float measurement) {
+
+    float error = setpoint - measurement;
+
+    float proportional = pid->Kp * error;
+
+    // Integral
+    pid->integrator = pid->integrator + 0.5f * pid->Ki * pid->T * (error + pid->prevError);
+
+    // TODO: Add integrator clamping
+
+    // Derivative
+    pid->differentiator = -(2.0f * pid->Kd * (measurement - pid->prevMeasurement) // NOTE: understand this better
+                        + (2.0f * pid->tau - pid->T) * pid->differentiator)
+                        / (2.0f * pid->tau + pid->T);
+
+
+    // Compute output and apply limits
+    pid->out = proportional + pid->integrator + pid->differentiator;
+
+    if (pid->out > pid->limMax) {pid->out = pid->limMax;}
+    else if (pid->out < pid->limMin) {pid->out = pid->limMin;}
+
+
+    // Store error and measurement for next cycle
+    pid->prevError = error;
+    pid->prevMeasurement = measurement;
+
+
+    // Return controller output
+    return pid->out;
+}
 
 
 /*Initializes all nescessary memory arrays with sizes defined at runtime*/
@@ -196,17 +278,16 @@ void on_pwm_wrap() {
     // printf("blah");
 
     // // Calculates delay from data block
-    // uint8_t elem = temp;//block[cycleCount]; //block must be of the correct length TODO: fix
+    //target = block[cycleCount]; //block must be of the correct length TODO: fix
     
-    // if (elem < 100) {
-    //     delay = elem * 5;
-    // }
+    if (target < 100) {
+        delay = target * 5;
+    }
 
-    // else if (elem >= 100) {
-    //     delay = (elem - 100) * 5;
-    // }
+    else if (target >= 100) {
+        delay = (target - 100) * 5;
+    }
     
- 
     // Update nextState for next cycle
     if (target < 100) { // Negative pulses
         //delay = (100-cycleCount)*5; // Delay in PIO cycles @ 25 MHz
@@ -226,14 +307,6 @@ void on_pwm_wrap() {
  
     cycleCount++;
     //if (cycleCount > 200) {cycleCount=0;} // Wrap cycle count for test
-}
-
-
-uint16_t adc_sample() {
-    uint16_t result = adc_read();
-    //printf("\nADC: %u", result);
-
-    return result;
 }
 
 
@@ -294,6 +367,11 @@ void init_pulse() {
     adc_gpio_init(26);
     // Select ADC input 0 (GPIO26)
     adc_select_input(0);
+
+
+    // Initializes trigger pin
+    gpio_init(TRIGGER_PIN);
+    gpio_set_dir(TRIGGER_PIN, GPIO_IN);
 }
 
 
@@ -302,11 +380,9 @@ void shutdown_pulse() {
     // Turn off PWM
     pwm_set_enabled(0, false);
     irq_set_enabled(PWM_IRQ_WRAP, false);
-    sleep_ms(1);
  
     // Return to off state
     pio_sm_put(pio0, sm, stop2free);
-    sleep_ms(1000);
  
     //Turn off pio
     pio_sm_set_enabled(pio0, sm, false);
@@ -324,67 +400,107 @@ void shutdown_pulse() {
 void run_pulse(uint16_t block_length_uint) {
     uint8_t *buffer;
     uint16_t scale_target;
-    uint16_t adc;
+    uint16_t result;
+    const float conversion_factor = 3.3f / (1 << 12);
+    float setpoint;
+    float measurement;
+
+
+    // // PID Definitions (TODO: Figure out if I want this here or in header)
+    // #define PID_KP 1.0f
+    // #define PID_KI 1.0f
+    // #define PID_KD 1.0f
+
+    // #define PID_TAU 0.02f
+
+    // #define PID_LIM_MIN -100.0f
+    // #define PID_LIM_MAX 100.0f
+    
+    // #define PID_LIM_MIN_INT -50.0f
+    // #define PID_LIM_MAX_INT 50.0f
+
+    // #define SAMPLE_TIME_S 0.00002 // 20 us
+
+    // pid_controller pid = {  PID_KP, PID_KI, PID_KD,
+    //                         PID_TAU,
+    //                         PID_LIM_MIN, PID_LIM_MAX,
+	// 		                PID_LIM_MIN_INT, PID_LIM_MAX_INT,
+    //                         SAMPLE_TIME_S };
+
+    // pid_controller_init(&pid);
+
 
     // Initializes pwm
     init_pulse();    
 
-    // Initializes trigger pin
-    gpio_init(LED_PIN);
-    gpio_set_dir(LED_PIN, GPIO_IN);
 
     // Turn on SPA in freewheeling state and activate PWM
-    delay = 250;
-    nextState = (stop2free << 24) | (( delay << 8) | free2stop);
-    pio_sm_put(pio0, sm, nextState);
-
-    // Waits until trigger pin is flipped
-    while (true) {if (gpio_get(TRIGGER_PIN) == 1) {break;}}
+    //delay = 250;
+    //nextState = (stop2free << 24) | (( delay << 8) | free2stop);
+    //pio_sm_put(pio0, sm, nextState);
 
 
+    // Wait until trigger pin is flipped
+//    while (true) {if (gpio_get(TRIGGER_PIN) == 1) {break;}}
+
+
+    // Start PWM
     pwm_set_enabled(0, true);
+    
 
+    // Pulse Loop
     for (uint16_t cycle = 0; cycle <= block_length_uint; cycle++) {
         // Target coil voltage
-        target = block[cycle];
+        //target = block[cycle];
 
-        //TODO: put ADC sampling and PID algorythm here
-        const float conversion_factor = 3.3f / (1 << 12);
-        adc = adc_sample();
-        printf("\nADC: %u, %f", adc, adc* conversion_factor);
+//         // ADC Sampling
+//         //adc_block[cycle + 5] = (adc_read() * conversion_factor);
 
-        gpio_block[cycle + 5] = target;
-        //printf("\nCycle: %u, Block: %u", cycle, gpio_block[cycle + 5]);
-        gpio_block_cs += target;
+// //        setpoint = (float)target;
 
-        if (target < 100) {
-            scale_target = target * 5;
-        }
+// //        measurement = setpoint; //(adc_block[cycle+5]/3.3) * 100; // This needs to be changed for actual coil (part of coil tuning)
 
-        else if (target >= 100) {
-            scale_target = (target - 100) * 5;
-        }
+//         // PID Control
         
-        //google atomic operations
-        while (true){
-            if (pwm_flag == 1) {delay = scale_target; pwm_flag = 0; break;}
+//         //printf("\nT: %u, SP: %f", target, setpoint);
+
+// //        pid_controller_update(&pid, setpoint, measurement);
+
+//         //target = (uint8_t)pid.out;
+        
+// //        printf("\nADC: %f, SP: %f, Target: %u", measurement, setpoint, target);
+
+// //        gpio_block[cycle + 5] = target;
+//         //printf("\nCycle: %u, Block: %u", cycle, gpio_block[cycle + 5]);
+// //        gpio_block_cs += target;
+
+//         if (target < 100) {
+//             scale_target = target * 5;
+//         }
+
+//         else if (target >= 100) {
+//             scale_target = (target - 100) * 5;
+//         }
+//         //printf("\nt: %u", target);
+
+    setpoint = block[cycle];
+
+    adc_block[cycle + 5] = (adc_read() * conversion_factor);
+
+
+    while (true) {
+        if (pwm_flag == 1) {
+                
+            target = setpoint;
+
+            pwm_flag = 0; 
+
+            break;
         }
     }
+}
 
-
-    // // Ramp positive pulses
-    // for (int i=0; i<=17; i++) {
-    //     sleep_ms(1000);
-    //     delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
-    //     nextState = (poss2free << 24) | ( delay << 8) | free2poss;
-    // }
-    
-    // // Ramp negative pulses
-    // for (int i=0; i<=17; i++) {
-    //     sleep_ms(1000);
-    //     delay = (i+1)*25; // 1-18 us (5% - 90% DCP)
-    //     nextState = (neg2free << 24) | ( delay << 8) | free2neg;
-    // }
+    //busy_wait_us(20*100);
 
     shutdown_pulse();
 }
@@ -437,7 +553,7 @@ int main() {
     build_return_block(block_length_uint);
 
     busy_wait_ms(1000); //DELETE MEEEEEEE
-    send_block(block_length_uint);
+    //send_block(block_length_uint);
 
 
     return 0;

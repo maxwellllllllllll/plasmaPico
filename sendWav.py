@@ -45,7 +45,7 @@ def serialInit():
     return ser
 
 def buildTestDataBlock():
-    blockLength = 10000 # 10,000
+    blockLength = 10 # 10,000
     dataBytes = bytearray()
 
     j = 0
@@ -54,13 +54,13 @@ def buildTestDataBlock():
         dataBytes.append(math.floor(j))
 
         if flip == False:
-            j += 0.5
+            j = 150
         elif flip == True:
-            j -= 0.5
+            j = 50
         
-        if j == 200:
+        if i % 2 == 0:
             flip = True
-        elif j == 0:
+        else:
             flip = False
     
     return dataBytes
