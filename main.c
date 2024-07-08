@@ -213,11 +213,47 @@ void scan_for_input() {
 }
 
 
+/*Once a block is detected by scan_for_input(), classifies and
+collects the rest of the block*/
+// TODO: Rewrite me to use terminator stuff!!
+uint16_t get_block(){
+    char c_in;
+    
+    char block_length1;
+    char block_length2;
+    uint16_t block_length_uint;
+
+    char block_type;
+    #define DATA 0x01
+    #define TRAILER 0x55
+    #define DATA_BLOCK_LENGTH 256
+
+
+    state = GETTING_BLOCK;
+
+
+    scanf("%c", &block_type);
+        
+    switch (block_type) {
+        case DATA:
+            scanf("%c", &block_length1);
+            scanf("%c", &block_length2);
+
+            int block_length = (block_length2 << 8) | block_length1;
+            printf("\nbl: %d\n", block_length);
+            block_length_uint = (uint16_t)block_length;
+
+    }
+}
+
+
 int main() {
 
     stdio_init_all();
 
     scan_for_input();
+
+    get_block();
 
     sleep_ms(5000); // Needed to allow stdio init to complete without interfearing with FIFO buffers
 

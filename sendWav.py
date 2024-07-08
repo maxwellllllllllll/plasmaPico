@@ -46,7 +46,7 @@ def serialInit():
     return ser
 
 def buildTestDataBlock():
-    blockLength = 10 # 10,000
+    blockLength = 1000 # 10,000
     dataBytes = bytearray()
 
     j = 50
