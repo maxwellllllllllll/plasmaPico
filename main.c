@@ -147,6 +147,8 @@ void shutdown_pulse() {
 void run_pulse() {
     uint32_t setpoint;
 
+    block_length_uint = 200;
+
     // Loads freewheeling state as first PWM pulse
     delay = 250;
     nextState = (stop2free << 24) | (( delay << 8) | free2stop);
@@ -163,11 +165,17 @@ void run_pulse() {
         }
     }
 
-    busy_wait_us(20*200);
-
     pwm_set_enabled(0, false);
 
     return;
+}
+
+
+/* Continually scans for input. Does not terminate until 
+an input block is received*/
+void scan_for_input() {
+    char in;
+
 }
 
 
