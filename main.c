@@ -30,6 +30,7 @@ uint32_t __not_in_flash("pwm") target;
 uint __not_in_flash("pwm") sm;
 
 // Data block
+unsigned char* block; // loaded with data for pulse
 uint16_t __not_in_flash("pwm") block_length_uint;
 
 // Facilitates cpu-pwm communication
@@ -213,6 +214,12 @@ void scan_for_input() {
 }
 
 
+/*Initializes all nescessary memory arrays with sizes defined at runtime*/
+void mem_init(uint16_t block_length) {
+    block = (unsigned char*)malloc(block_length * sizeof(unsigned char));
+}
+
+
 /*Once a block is detected by scan_for_input(), classifies and
 collects the rest of the block*/
 // TODO: Rewrite me to use terminator stuff!!
@@ -243,6 +250,7 @@ uint16_t get_block(){
             printf("\nbl: %d\n", block_length);
             block_length_uint = (uint16_t)block_length;
 
+            mem_init(block_length_uint);
     }
 }
 
