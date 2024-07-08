@@ -1,5 +1,6 @@
 import serial
 import math
+import pandas as pd
 
 def buildTransferBlock(dataBytes: bytearray):
     length = len(dataBytes)
@@ -45,14 +46,14 @@ def serialInit():
     return ser
 
 def buildTestDataBlock():
-    blockLength = 1000 # 10,000
+    blockLength = 10 # 10,000
     dataBytes = bytearray()
 
     j = 50
     flip = False
     for i in range(blockLength):
         #print(j)
-        dataBytes.append(50) #math.floor(j)
+        dataBytes.append(52) #math.floor(j)
 
         if flip == False:
             j = 150
@@ -67,6 +68,9 @@ def buildTestDataBlock():
     return dataBytes
 
 
+returnList = []
+
+
 ser = serialInit()
 
 listVals = [0x55, 0x3C, 0x01, 0x02, 0x02, 0x01, 0x03, 0x55] # Head, Sync, Type, Length, [data], cs, trailer
@@ -77,11 +81,24 @@ dataBytes = buildTestDataBlock()
 
 transferBlock = buildTransferBlock(dataBytes)
 
-ser.write(transferBlock)
-
 while True:
-    print(ser.readline())
+    if input("trig? "):
+        ser.write(transferBlock) 
+        print("written")
+        for i in range(10):
+            print(ser.readline())
 
+# for i in range(20):
+#     line = ser.readline()
+#     #returnList.append(line)
+#     print(line)
+    
+
+df = pd.DataFrame(returnList)
+
+csvData = df.to_csv('csvFile', index=False)
+
+#print(df)
 
 ser.close()
 print("here")
