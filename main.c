@@ -26,7 +26,7 @@ uint16_t delay;
 
 uint sm;
 
-uint8_t target;
+uint16_t target;
 
 int flag_track = 0;
 
@@ -273,12 +273,13 @@ void scan_for_input(){
 
 void on_pwm_wrap() {
     pwm_clear_irq(0);
-    // pio0->txf[sm] = nextState; // Same as pio_sm_put without checking
 
-    // printf("blah");
+    pio_sm_put(pio0, sm, nextState); // Does moving this up here fix it? NOTE: Will break first pulse
+
+    //pio0->txf[sm] = nextState; // Same as pio_sm_put without checking
 
     // // Calculates delay from data block
-    target = block[cycleCount]; //block must be of the correct length TODO: fix
+    target = 50;//block[cycleCount]; //block must be of the correct length TODO: fix
     
     if (target < 100) {
         delay = target * 5;
@@ -301,9 +302,7 @@ void on_pwm_wrap() {
     if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
     nextState = nextState | ( delay << 8);
 
-    pio_sm_put(pio0, sm, nextState);
-
-    pwm_flag = 1;
+    //pwm_flag = 1;
  
     cycleCount++;
     //if (cycleCount > 200) {cycleCount=0;} // Wrap cycle count for test
@@ -360,13 +359,13 @@ void init_pulse() {
     pwm_init(0, &config, false);
 
 
-    // Setting up ADC
-    adc_init();
+    // // Setting up ADC
+    // adc_init();
 
-    // Make sure GPIO is high-impedance, no pullups etc
-    adc_gpio_init(26);
-    // Select ADC input 0 (GPIO26)
-    adc_select_input(0);
+    // // Make sure GPIO is high-impedance, no pullups etc
+    // adc_gpio_init(26);
+    // // Select ADC input 0 (GPIO26)
+    // adc_select_input(0);
 
 
     // Initializes trigger pin
@@ -399,7 +398,7 @@ void shutdown_pulse() {
 // Split into seperate functions
 void run_pulse(uint16_t block_length_uint) {
     uint8_t *buffer;
-    uint16_t scale_target;
+    //uint16_t scale_target;
     uint16_t result;
     const float conversion_factor = 3.3f / (1 << 12);
     float setpoint;
@@ -449,58 +448,60 @@ void run_pulse(uint16_t block_length_uint) {
     
 
     // Pulse Loop
-    for (uint16_t cycle = 0; cycle <= block_length_uint; cycle++) {
-        // Target coil voltage
-        //target = block[cycle];
+//     for (uint16_t cycle = 0; cycle <= block_length_uint; cycle++) {
+//         // Target coil voltage
+//         //target = block[cycle];
 
-//         // ADC Sampling
-//         //adc_block[cycle + 5] = (adc_read() * conversion_factor);
+// //         // ADC Sampling
+// //         //adc_block[cycle + 5] = (adc_read() * conversion_factor);
 
-// //        setpoint = (float)target;
+// // //        setpoint = (float)target;
 
-// //        measurement = setpoint; //(adc_block[cycle+5]/3.3) * 100; // This needs to be changed for actual coil (part of coil tuning)
+// // //        measurement = setpoint; //(adc_block[cycle+5]/3.3) * 100; // This needs to be changed for actual coil (part of coil tuning)
 
-//         // PID Control
+// //         // PID Control
         
-//         //printf("\nT: %u, SP: %f", target, setpoint);
+// //         //printf("\nT: %u, SP: %f", target, setpoint);
 
-// //        pid_controller_update(&pid, setpoint, measurement);
+// // //        pid_controller_update(&pid, setpoint, measurement);
 
-//         //target = (uint8_t)pid.out;
+// //         //target = (uint8_t)pid.out;
         
-// //        printf("\nADC: %f, SP: %f, Target: %u", measurement, setpoint, target);
+// // //        printf("\nADC: %f, SP: %f, Target: %u", measurement, setpoint, target);
 
-// //        gpio_block[cycle + 5] = target;
-//         //printf("\nCycle: %u, Block: %u", cycle, gpio_block[cycle + 5]);
-// //        gpio_block_cs += target;
+// // //        gpio_block[cycle + 5] = target;
+// //         //printf("\nCycle: %u, Block: %u", cycle, gpio_block[cycle + 5]);
+// // //        gpio_block_cs += target;
 
-//         if (target < 100) {
-//             scale_target = target * 5;
-//         }
+// //         if (target < 100) {
+// //             scale_target = target * 5;
+// //         }
 
-//         else if (target >= 100) {
-//             scale_target = (target - 100) * 5;
-//         }
-//         //printf("\nt: %u", target);
+// //         else if (target >= 100) {
+// //             scale_target = (target - 100) * 5;
+// //         }
+// //         //printf("\nt: %u", target);
 
-    setpoint = block[cycle];
+//         setpoint = block[cycle];
 
-    adc_block[cycle + 5] = (adc_read() * conversion_factor);
+//         // adc_block[cycle + 5] = (adc_read() * conversion_factor);
+
+//         printf("\n %f", setpoint);
 
 
-    while (true) {
-        if (pwm_flag == 1) {
-                
-            target = setpoint;
+//         // while (true) {
+//         //     if (pwm_flag == 1) {
+                    
+//         //         target = setpoint;
 
-            pwm_flag = 0; 
+//         //         pwm_flag = 0; 
 
-            break;
-        }
-    }
-}
+//         //         break;
+//         //     }
+//         // }
+//     }
 
-    //busy_wait_us(20*100);
+    busy_wait_us(20*100);
 
     shutdown_pulse();
 }

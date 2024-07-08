@@ -3,7 +3,7 @@ import math
 
 def buildTransferBlock(dataBytes: bytearray):
     length = len(dataBytes)
-    print(length)
+    #print(length)
     out = bytearray(length + 7)
 
 
@@ -45,13 +45,14 @@ def serialInit():
     return ser
 
 def buildTestDataBlock():
-    blockLength = 3000 # 10,000
+    blockLength = 1000 # 10,000
     dataBytes = bytearray()
 
-    j = 0
+    j = 50
     flip = False
     for i in range(blockLength):
-        dataBytes.append(math.floor(j))
+        #print(j)
+        dataBytes.append(50) #math.floor(j)
 
         if flip == False:
             j = 150
