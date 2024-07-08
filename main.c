@@ -18,18 +18,20 @@ uint32_t S2 = 0x00000002; // 0010
 uint32_t S1 = 0x00000001; // 0001
 
 // Pulse States
-uint32_t __not_in_flash("group") stop2free, free2stop, free2poss, free2neg, poss2free, neg2free;
-uint32_t __not_in_flash("group") freeCycle, possCycle, negCycle;
-uint32_t __not_in_flash("group") nextState, cycleCount;
+uint32_t __not_in_flash("pwm") stop2free, free2stop, free2poss, free2neg, poss2free, neg2free;
+uint32_t __not_in_flash("pwm") freeCycle, possCycle, negCycle;
+uint32_t __not_in_flash("pwm") nextState, cycleCount;
 
-uint32_t __not_in_flash("group") delay;
+uint32_t __not_in_flash("pwm") delay;
 
-uint __not_in_flash("group") sm;
+uint __not_in_flash("pwm") sm;
 
-uint32_t __not_in_flash("group") target;
+uint32_t __not_in_flash("pwm") target;
 
 
-const uint TRIGGER_PIN = 2;
+uint16_t __not_in_flash("pwm") block_length_uint;
+
+uint8_t __not_in_flash("pwm") pwm_flag;
 
 
 void __time_critical_func(on_pwm_wrap)() {
@@ -57,7 +59,7 @@ void __time_critical_func(on_pwm_wrap)() {
     // for debugging
     //next_state_block[cycleCount] = nextState;
 
-    //pwm_flag = 1;
+    pwm_flag = 1;
  
     cycleCount++;
 }
@@ -121,11 +123,6 @@ void init_pulse() {
     // // Select ADC input 0 (GPIO26)
     // adc_select_input(0);
 
-
-    // Initializes trigger pin
-    gpio_init(TRIGGER_PIN);
-    gpio_set_dir(TRIGGER_PIN, GPIO_IN);
-
     return;
 }
 
@@ -148,9 +145,23 @@ void shutdown_pulse() {
 
 // Split into seperate functions
 void run_pulse() {
+    uint32_t setpoint;
+
+    // Loads freewheeling state as first PWM pulse
+    delay = 250;
+    nextState = (stop2free << 24) | (( delay << 8) | free2stop);
 
     // Start PWM
     pwm_set_enabled(0, true);
+
+    // Pulse Loop
+    for (uint16_t cycle = 0; cycle <= block_length_uint; cycle++) {
+        setpoint = 52;
+
+        while (true) {
+            if (pwm_flag == 1) {target = setpoint; pwm_flag = 0; break;}
+        }
+    }
 
     busy_wait_us(20*200);
 
