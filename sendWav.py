@@ -53,7 +53,7 @@ def buildTestDataBlock():
     flip = False
     for i in range(blockLength):
         #print(j)
-        dataBytes.append(52) #math.floor(j)
+        dataBytes.append(math.floor(j))
 
         if flip == False:
             j = 150

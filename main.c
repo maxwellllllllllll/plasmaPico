@@ -155,10 +155,9 @@ void shutdown_pulse() {
 
 
 // Split into seperate functions
-void run_pulse() {
+void run_pulse(uint16_t pulseCycles) {
     uint32_t setpoint;
 
-    block_length_uint = 200;
 
     // Loads freewheeling state as first PWM pulse
     delay = 250;
@@ -168,8 +167,8 @@ void run_pulse() {
     pwm_set_enabled(0, true);
 
     // Pulse Loop
-    for (uint16_t cycle = 0; cycle <= block_length_uint; cycle++) {
-        setpoint = 52;
+    for (uint16_t cycle = 0; cycle <= pulseCycles; cycle++) {
+        setpoint = block[cycle];
 
         while (true) {
             if (pwm_flag == 1) {target = setpoint; pwm_flag = 0; break;}
@@ -223,7 +222,7 @@ void mem_init(uint16_t block_length) {
 /*Once a block is detected by scan_for_input(), classifies and
 collects the rest of the block*/
 // TODO: Rewrite me to use terminator stuff!!
-void get_block(){
+uint16_t get_block(){
     char c_in;
     
     char block_length1;
@@ -297,17 +296,18 @@ void get_block(){
     }
 
 
-    return;
+    return block_length_uint;
 }
 
 
 int main() {
+uint16_t numCycles;
 
     stdio_init_all();
 
     scan_for_input();
 
-    get_block();
+    numCycles = get_block();
 
     sleep_ms(5000); // Needed to allow stdio init to complete without interfearing with FIFO buffers
 
@@ -315,11 +315,11 @@ int main() {
 
     // Loops pulses for new inputs
     while (true) {
-        run_pulse();
+        run_pulse(numCycles);
         
         scan_for_input();
 
-        get_block(); // put this in an if statment depending on what scan_for_input returns
+        numCycles = get_block(); // put this in an if statment depending on what scan_for_input returns
 
         sleep_ms(5000); // NOTE: will need to figure out to do this once scan_for_input returns implimented
 
