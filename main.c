@@ -22,16 +22,26 @@ uint32_t __not_in_flash("pwm") stop2free, free2stop, free2poss, free2neg, poss2f
 uint32_t __not_in_flash("pwm") freeCycle, possCycle, negCycle;
 uint32_t __not_in_flash("pwm") nextState, cycleCount;
 
+// Pulse Charicteristics
 uint32_t __not_in_flash("pwm") delay;
-
-uint __not_in_flash("pwm") sm;
-
 uint32_t __not_in_flash("pwm") target;
 
+// pio state machine
+uint __not_in_flash("pwm") sm;
 
+// Data block
 uint16_t __not_in_flash("pwm") block_length_uint;
 
+// Facilitates cpu-pwm communication
 uint8_t __not_in_flash("pwm") pwm_flag;
+
+
+// Device States
+int state;
+#define AWAIT_HEADER 1
+#define AWAIT_SYNC 2
+#define BLOCK_FOUND 3
+#define GETTING_BLOCK 4
 
 
 void __time_critical_func(on_pwm_wrap)() {
@@ -41,7 +51,7 @@ void __time_critical_func(on_pwm_wrap)() {
     pio0->txf[sm] = nextState; // Same as pio_sm_put without checking
 
     // // Calculates delay from data block
-    target = 52; //block[cycleCount];
+    //target = 52; //block[cycleCount];
     
     // Update nextState for next cycle
     if (target < 100) { // Negative pulses
@@ -175,19 +185,43 @@ void run_pulse() {
 an input block is received*/
 void scan_for_input() {
     char in;
+    state = AWAIT_HEADER;
 
+    while ( true ) {
+        scanf("%c", &in);
+        
+        //printf("%d\n", in);
+
+        switch (state) {
+            case AWAIT_HEADER:
+                if (in == 0x55) {
+                    state = AWAIT_SYNC;
+                    printf("Await header");
+                }
+                break;
+            
+            case AWAIT_SYNC:
+                if (in == 0x3C) {
+                    printf("await sync");
+                    state = BLOCK_FOUND;
+                    return;
+                }
+            default:
+                break;
+        }
+    }
 }
 
 
 int main() {
 
-    //stdio_init_all();
+    stdio_init_all();
+
+    scan_for_input();
+
+    sleep_ms(5000); // Needed to allow stdio init to complete without interfearing with FIFO buffers
 
     init_pulse();
-
-    run_pulse();
-
-    sleep_ms(1000);
 
     run_pulse();
 
