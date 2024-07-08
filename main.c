@@ -243,6 +243,11 @@ void get_block(){
 
     state = GETTING_BLOCK;
 
+    // clears block TODO: make sure this works
+    for (int i = 0; i < block_length_uint; i++) {
+        block[i] = '\0';
+    }
+
 
     scanf("%c", &block_type);
         
@@ -308,7 +313,19 @@ int main() {
 
     init_pulse();
 
-    run_pulse();
+    // Loops pulses for new inputs
+    while (true) {
+        run_pulse();
+        
+        scan_for_input();
+
+        get_block(); // put this in an if statment depending on what scan_for_input returns
+
+        sleep_ms(5000); // NOTE: will need to figure out to do this once scan_for_input returns implimented
+
+        //add in break here if scan_for_input returns a different thing
+    }
+    
 
     shutdown_pulse();
 
