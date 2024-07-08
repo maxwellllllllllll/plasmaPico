@@ -223,7 +223,7 @@ void mem_init(uint16_t block_length) {
 /*Once a block is detected by scan_for_input(), classifies and
 collects the rest of the block*/
 // TODO: Rewrite me to use terminator stuff!!
-uint16_t get_block(){
+void get_block(){
     char c_in;
     
     char block_length1;
@@ -235,6 +235,11 @@ uint16_t get_block(){
     #define TRAILER 0x55
     #define DATA_BLOCK_LENGTH 256
 
+    // checksum
+    uint8_t cs = 0; // calculated checksum
+    char cs_received; // recieved checksum
+
+    char trailer_received;
 
     state = GETTING_BLOCK;
 
@@ -247,11 +252,47 @@ uint16_t get_block(){
             scanf("%c", &block_length2);
 
             int block_length = (block_length2 << 8) | block_length1;
-            printf("\nbl: %d\n", block_length);
             block_length_uint = (uint16_t)block_length;
 
             mem_init(block_length_uint);
+
+            // Sequentially reads all data bytes and loads them into block
+            for (uint16_t block_index = 0; block_index < block_length; block_index++) { //Rewrite me to use trailer byte once that is better implimented
+                scanf("%c", &c_in);
+
+                block[block_index] = c_in;
+
+                // checksum
+                cs += c_in;
+            }
+
+            // verify checksum
+            scanf("%c", &cs_received);
+            if (cs != cs_received) {
+                // TODO Error handling
+                printf("CHECKSUM ERROR");
+            }
+            else {
+                printf("Checksum evaluated successfully");
+            }
+
+            // trailer
+            scanf("%c", &trailer_received);
+            if (trailer_received != TRAILER) {
+                printf("\nyou should never get here");
+            }
+
+            break;
+        
+        
+        default:
+            // handle this better
+            printf("TYPE ERROR");
+            break;
     }
+
+
+    return;
 }
 
 
