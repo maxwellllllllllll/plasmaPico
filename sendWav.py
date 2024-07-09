@@ -75,16 +75,16 @@ def buildSineDataBlock():
     j = 50
     flip = False
     for i in range(dataLength):
-        dataBytes.append(j)
+        dataBytes.append(math.floor(j))
 
         if flip == False:
-            j += 1
+            j += 0.1
         elif flip == True:
-            j -= 1
+            j -= 0.1
         
-        if j == 200:
+        if j >= 200:
             flip = True
-        elif j == 0:
+        elif j <= 1:
             flip = False
     
     return dataBytes
