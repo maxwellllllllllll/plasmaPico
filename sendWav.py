@@ -68,6 +68,29 @@ def buildTestDataBlock():
     return dataBytes
 
 
+def buildSineDataBlock():
+    blockLength = 1000 # 10,000
+    dataBytes = bytearray()
+
+    j = 50
+    flip = False
+    for i in range(blockLength):
+        print(j)
+        dataBytes.append(j)
+
+        if flip == False:
+            j += 1
+        elif flip == True:
+            j -= 1
+        
+        if j == 200:
+            flip = True
+        elif j == 0:
+            flip = False
+    
+    return dataBytes
+
+
 returnList = []
 
 
@@ -77,12 +100,19 @@ listVals = [0x55, 0x3C, 0x01, 0x02, 0x02, 0x01, 0x03, 0x55] # Head, Sync, Type, 
 
 byteVals = bytearray(listVals)
 
-dataBytes = buildTestDataBlock()
-
-transferBlock = buildTransferBlock(dataBytes)
-
 while True:
-    if input("trig? "):
+    inp  = input("trig? ")
+    if inp == 'y':
+        dataBytes = buildTestDataBlock()
+        transferBlock = buildTransferBlock(dataBytes)
+        ser.write(transferBlock) 
+        print("written")
+        for i in range(10):
+            print(ser.readline())
+    
+    elif inp == 's':
+        dataBytes = buildSineDataBlock()
+        transferBlock = buildTransferBlock(dataBytes)
         ser.write(transferBlock) 
         print("written")
         for i in range(10):
