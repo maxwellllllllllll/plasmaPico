@@ -34,8 +34,12 @@ unsigned char* block; // loaded with data for pulse
 uint16_t __not_in_flash("pwm") block_length_uint;
 
 // Return Block
-uint32_t* return_block;
-uint8_t return_block_cs;
+uint32_t* pio_block;
+uint8_t pio_block_cs; //is it better to have the checksums calculated at the end as part of return_block()? It's slightly slower but maybe cleaner? TODO: figure this out
+
+// ADC block
+uint16_t* adc_block;
+uint8_t adc_block_cs;
 
 // Facilitates cpu-pwm communication
 uint8_t __not_in_flash("pwm") pwm_flag;
@@ -134,13 +138,13 @@ void init_pulse() {
     pwm_init(0, &config, false);
 
 
-    // // Setting up ADC
-    // adc_init();
+    // Setting up ADC
+    adc_init();
 
-    // // Make sure GPIO is high-impedance, no pullups etc
-    // adc_gpio_init(26);
-    // // Select ADC input 0 (GPIO26)
-    // adc_select_input(0);
+    // Make sure GPIO is high-impedance, no pullups etc
+    adc_gpio_init(26);
+    // Select ADC input 0 (GPIO26)
+    adc_select_input(0);
 
     return;
 }
@@ -165,7 +169,8 @@ void shutdown_pulse() {
 // Split into seperate functions
 void run_pulse(uint16_t pulseCycles) {
     uint32_t setpoint;
-
+    float measurement; // ADC in
+    const float conversion_factor = 3.3f / (1 << 12); // Converts ADC signal to voltage
 
     // Loads freewheeling state as first PWM pulse
     delay = 250;
@@ -178,7 +183,10 @@ void run_pulse(uint16_t pulseCycles) {
     for (uint16_t cycle = 0; cycle <= pulseCycles; cycle++) {
         setpoint = block[cycle];
 
-        return_block[cycle + 5] = setpoint;
+        pio_block[cycle + 5] = setpoint; // TODO: change how blocks are assembled so this is just cycle
+
+        measurement = adc_read() * conversion_factor;
+        adc_block[cycle + 5] = measurement; // TODO: change how blocks are assembled so this is just cycle
 
         while (true) {
             if (pwm_flag == 1) {target = setpoint; pwm_flag = 0; break;}
@@ -222,7 +230,8 @@ void scan_for_input() {
 /*Initializes all nescessary memory arrays with sizes defined at runtime*/
 void mem_init(uint16_t block_length) {
     block = (unsigned char*)malloc(block_length * sizeof(unsigned char));
-    return_block = (uint32_t*)malloc((block_length + 7) * sizeof(uint32_t));
+    pio_block = (uint32_t*)malloc((block_length + 7) * sizeof(uint32_t)); // TODO: remember to change this once return_block() is reworked
+    adc_block = (uint16_t*)malloc((block_length + 7) * sizeof(uint16_t));
 }
 
 
@@ -305,22 +314,22 @@ uint16_t get_block(){
 void build_return_block(uint16_t block_length) {
     // Return GPIO Block
     // Build GPIO Block
-    return_block[0] = 0x55;                                             // Head
-    return_block[1] = 0x3C;                                             // Sync
-    return_block[2] = 0x02;                                             // Block Type (GPIO Result)
-    return_block[3] = 0x00;                                             // Data Length First Byte
-    return_block[4] = 0x00;                                             // Data Length Second Byte
+    pio_block[0] = 0x55;                                             // Head
+    pio_block[1] = 0x3C;                                             // Sync
+    pio_block[2] = 0x02;                                             // Block Type (GPIO Result)
+    pio_block[3] = 0x00;                                             // Data Length First Byte
+    pio_block[4] = 0x00;                                             // Data Length Second Byte
    
     // [GPIO Data]
    
-    return_block[block_length+1] = (uint32_t)return_block_cs;           // Checksum
-    return_block[block_length+2] = 0x55;                                // Trailer
+    pio_block[block_length+1] = (uint32_t)pio_block_cs;              // Checksum
+    pio_block[block_length+2] = 0x55;                                // Trailer
 }
 
 
 void send_block(uint16_t block_length) {
     for (int i=0; i < (block_length + 7); i++) {
-        printf("\nRX: %x", return_block[i]);
+        printf("\nRX: %x", pio_block[i]);
     }
 }
 

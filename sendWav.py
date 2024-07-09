@@ -75,7 +75,6 @@ def buildSineDataBlock():
     j = 50
     flip = False
     for i in range(dataLength):
-        print(j)
         dataBytes.append(j)
 
         if flip == False:
@@ -96,10 +95,12 @@ def recieveDataBlock(blockLength):
 
     while True:
         read = ser.readline()
+        print(read)
         if read != b'':
             returnList.append(read)
             break
 
+    print("building")
     for i in range(blockLength): # redo me with new data block trailer system once implimented
         returnList.append(ser.readline())
     
