@@ -57,6 +57,40 @@ char block_type;
 #define DATA 0x01
 
 
+// PID Controller
+typedef struct {
+
+    /* Controller Gains */
+    float Kp;
+    float Ki;
+    float Kd;
+
+    /* Derivative low-pass filter time constant */
+    float tau;
+
+    /* Output limits */
+    float limMin;
+    float limMax;
+
+    /* Integrator limits */
+    float limMinInt;
+    float limMaxInt;
+
+    /* Sample time (s)*/
+    float T;
+
+    /* Controller "memory" */
+    float integrator;
+    float prevError;        // for integrator
+    float differentiator;
+    float prevMeasurement;  // for differentiator
+
+    /* Controller output */
+    float out;
+
+} pid_controller;
+
+
 void __time_critical_func(on_pwm_wrap)() {
     pwm_clear_irq(0);
 
@@ -85,6 +119,53 @@ void __time_critical_func(on_pwm_wrap)() {
     pwm_flag = 1;
  
     cycleCount++;
+}
+
+
+void pid_controller_init(pid_controller *pid) {
+
+    // Clear controller variables
+    pid->integrator = 0.0f;
+    pid->prevError = 0.0f;
+
+    pid->differentiator = 0.0f;
+    pid->prevMeasurement = 0.0f;
+
+    pid->out = 0.0f;
+}
+
+
+float pid_controller_update(pid_controller *pid, float setpoint, float measurement) {
+
+    float error = setpoint - measurement;
+
+    float proportional = pid->Kp * error;
+
+    // Integral
+    pid->integrator = pid->integrator + 0.5f * pid->Ki * pid->T * (error + pid->prevError);
+
+    // TODO: Add integrator clamping
+
+    // Derivative
+    pid->differentiator = -(2.0f * pid->Kd * (measurement - pid->prevMeasurement) // NOTE: understand this better
+                        + (2.0f * pid->tau - pid->T) * pid->differentiator)
+                        / (2.0f * pid->tau + pid->T);
+
+
+    // Compute output and apply limits
+    pid->out = proportional + pid->integrator + pid->differentiator;
+
+    if (pid->out > pid->limMax) {pid->out = pid->limMax;}
+    else if (pid->out < pid->limMin) {pid->out = pid->limMin;}
+
+
+    // Store error and measurement for next cycle
+    pid->prevError = error;
+    pid->prevMeasurement = measurement;
+
+
+    // Return controller output
+    return pid->out;
 }
 
 
