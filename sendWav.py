@@ -2,6 +2,8 @@ import serial
 import math
 import pandas as pd
 
+dataLength = 10000 # 10,000
+
 def buildTransferBlock(dataBytes: bytearray):
     length = len(dataBytes)
     #print(length)
@@ -46,12 +48,11 @@ def serialInit():
     return ser
 
 def buildTestDataBlock():
-    blockLength = 1000 # 10,000
     dataBytes = bytearray()
 
     j = 50
     flip = False
-    for i in range(blockLength):
+    for i in range(dataLength):
         #print(j)
         dataBytes.append(math.floor(j))
 
@@ -69,12 +70,11 @@ def buildTestDataBlock():
 
 
 def buildSineDataBlock():
-    blockLength = 1000 # 10,000
     dataBytes = bytearray()
 
     j = 50
     flip = False
-    for i in range(blockLength):
+    for i in range(dataLength):
         print(j)
         dataBytes.append(j)
 
@@ -91,7 +91,23 @@ def buildSineDataBlock():
     return dataBytes
 
 
-returnList = []
+def recieveDataBlock(blockLength):
+    returnList = []
+
+    while True:
+        read = ser.readline()
+        if read != b'':
+            returnList.append(read)
+            break
+
+    for i in range(blockLength): # redo me with new data block trailer system once implimented
+        returnList.append(ser.readline())
+    
+    df = pd.DataFrame(returnList)
+
+    df.to_csv('returnBlock.csv')
+
+    return df
 
 
 ser = serialInit()
@@ -100,35 +116,24 @@ listVals = [0x55, 0x3C, 0x01, 0x02, 0x02, 0x01, 0x03, 0x55] # Head, Sync, Type, 
 
 byteVals = bytearray(listVals)
 
+
 while True:
-    inp  = input("trig? ")
-    if inp == 'y':
-        dataBytes = buildTestDataBlock()
-        transferBlock = buildTransferBlock(dataBytes)
-        ser.write(transferBlock) 
-        print("written")
-        for i in range(10):
-            print(ser.readline())
-    
-    elif inp == 's':
-        dataBytes = buildSineDataBlock()
-        transferBlock = buildTransferBlock(dataBytes)
-        ser.write(transferBlock) 
-        print("written")
-        for i in range(10):
-            print(ser.readline())
 
-# for i in range(20):
-#     line = ser.readline()
-#     #returnList.append(line)
-#     print(line)
-    
+    while True:
+        inp = input("trig? ")
+        if inp == 'y':
+            dataBytes = buildTestDataBlock()
+            break
+            
+        
+        elif inp == 's':
+            dataBytes = buildSineDataBlock()
+            break
 
-df = pd.DataFrame(returnList)
+    transferBlock = buildTransferBlock(dataBytes)
+    ser.write(transferBlock) 
+    print("written")
 
-csvData = df.to_csv('csvFile', index=False)
-
-#print(df)
-
-ser.close()
-print("here")
+    df = recieveDataBlock(dataLength + 7)
+        
+    print(df)

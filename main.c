@@ -33,6 +33,10 @@ uint __not_in_flash("pwm") sm;
 unsigned char* block; // loaded with data for pulse
 uint16_t __not_in_flash("pwm") block_length_uint;
 
+// Return Block
+uint32_t* return_block;
+uint8_t return_block_cs;
+
 // Facilitates cpu-pwm communication
 uint8_t __not_in_flash("pwm") pwm_flag;
 
@@ -43,6 +47,10 @@ int state;
 #define AWAIT_SYNC 2
 #define BLOCK_FOUND 3
 #define GETTING_BLOCK 4
+
+// Block Types
+char block_type;
+#define DATA 0x01
 
 
 void __time_critical_func(on_pwm_wrap)() {
@@ -170,6 +178,8 @@ void run_pulse(uint16_t pulseCycles) {
     for (uint16_t cycle = 0; cycle <= pulseCycles; cycle++) {
         setpoint = block[cycle];
 
+        return_block[cycle + 5] = setpoint;
+
         while (true) {
             if (pwm_flag == 1) {target = setpoint; pwm_flag = 0; break;}
         }
@@ -189,20 +199,16 @@ void scan_for_input() {
 
     while ( true ) {
         scanf("%c", &in);
-        
-        //printf("%d\n", in);
 
         switch (state) {
             case AWAIT_HEADER:
                 if (in == 0x55) {
                     state = AWAIT_SYNC;
-                    printf("Await header");
                 }
                 break;
             
             case AWAIT_SYNC:
                 if (in == 0x3C) {
-                    printf("await sync");
                     state = BLOCK_FOUND;
                     return;
                 }
@@ -216,6 +222,7 @@ void scan_for_input() {
 /*Initializes all nescessary memory arrays with sizes defined at runtime*/
 void mem_init(uint16_t block_length) {
     block = (unsigned char*)malloc(block_length * sizeof(unsigned char));
+    return_block = (uint32_t*)malloc((block_length + 7) * sizeof(uint32_t));
 }
 
 
@@ -229,8 +236,6 @@ uint16_t get_block(){
     char block_length2;
     uint16_t block_length_uint;
 
-    char block_type;
-    #define DATA 0x01
     #define TRAILER 0x55
     #define DATA_BLOCK_LENGTH 256
 
@@ -276,9 +281,6 @@ uint16_t get_block(){
                 // TODO Error handling
                 printf("CHECKSUM ERROR");
             }
-            else {
-                printf("Checksum evaluated successfully");
-            }
 
             // trailer
             scanf("%c", &trailer_received);
@@ -300,6 +302,29 @@ uint16_t get_block(){
 }
 
 
+void build_return_block(uint16_t block_length) {
+    // Return GPIO Block
+    // Build GPIO Block
+    return_block[0] = 0x55;                                             // Head
+    return_block[1] = 0x3C;                                             // Sync
+    return_block[2] = 0x02;                                             // Block Type (GPIO Result)
+    return_block[3] = 0x00;                                             // Data Length First Byte
+    return_block[4] = 0x00;                                             // Data Length Second Byte
+   
+    // [GPIO Data]
+   
+    return_block[block_length+1] = (uint32_t)return_block_cs;           // Checksum
+    return_block[block_length+2] = 0x55;                                // Trailer
+}
+
+
+void send_block(uint16_t block_length) {
+    for (int i=0; i < (block_length + 7); i++) {
+        printf("\nRX: %x", return_block[i]);
+    }
+}
+
+
 int main() {
 uint16_t numCycles;
 
@@ -316,12 +341,13 @@ uint16_t numCycles;
     // Loops pulses for new inputs
     while (true) {
         run_pulse(numCycles);
+
+        build_return_block(numCycles);
+        send_block(numCycles);
         
         scan_for_input();
-
         numCycles = get_block(); // put this in an if statment depending on what scan_for_input returns
-
-        sleep_ms(5000); // NOTE: will need to figure out to do this once scan_for_input returns implimented
+        sleep_ms(5000); // NOTE: will need to figure out where to do this once scan_for_input returns implimented
 
         //add in break here if scan_for_input returns a different thing
     }
