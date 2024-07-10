@@ -90,7 +90,7 @@ def buildSineDataBlock():
     return dataBytes
 
 
-def recieveDataBlock(blockLength):
+def recieveDataBlock(blockLength, typeLabel: str):
     returnList = []
 
     while True:
@@ -102,13 +102,10 @@ def recieveDataBlock(blockLength):
 
     print("building")
     for i in range(blockLength): # redo me with new data block trailer system once implimented
-        returnList.append(ser.readline())
-    
-    df = pd.DataFrame(returnList)
+        read = ser.readline()
+        returnList.append(read)
 
-    df.to_csv('returnBlock.csv')
-
-    return df
+    return returnList
 
 
 ser = serialInit()
@@ -135,6 +132,16 @@ while True:
     ser.write(transferBlock) 
     print("written")
 
-    df = recieveDataBlock(dataLength + 7)
-        
+    print("pio")
+    pioReturn = recieveDataBlock(dataLength + 7, "pio")
+    print("adc")
+    adcReturn = recieveDataBlock(dataLength + 7, "adc")
+
+    df = pd.DataFrame(
+    {'pio': pioReturn,
+     'adc': adcReturn,
+    })
+
     print(df)
+
+    df.to_csv("returnData.csv")

@@ -267,7 +267,7 @@ void run_pulse(uint16_t pulseCycles) {
         pio_block[cycle + 5] = setpoint; // TODO: change how blocks are assembled so this is just cycle
 
         measurement = adc_read() * conversion_factor;
-        adc_block[cycle + 5] = measurement; // TODO: change how blocks are assembled so this is just cycle
+        adc_block[cycle + 5] = measurement * 100; // To avoid sending floats in block
 
         while (true) {
             if (pwm_flag == 1) {target = setpoint; pwm_flag = 0; break;}
@@ -392,7 +392,7 @@ uint16_t get_block(){
 }
 
 
-void build_return_block(uint16_t block_length) {
+void build_return_pio(uint16_t block_length) {
 
     // Return GPIO Block
     // Build GPIO Block
@@ -409,9 +409,33 @@ void build_return_block(uint16_t block_length) {
 }
 
 
-void send_block(uint16_t block_length) {
+void send_pio(uint16_t block_length) {
     for (int i=0; i < (block_length + 7); i++) {
         printf("\nRX: %x", pio_block[i]);
+    }
+}
+
+
+void build_return_adc(uint16_t block_length) {
+
+    // Return GPIO Block
+    // Build GPIO Block
+    adc_block[0] = 0x55;                                             // Head
+    adc_block[1] = 0x3C;                                             // Sync
+    adc_block[2] = 0x03;                                             // Block Type (ADC Result)
+    adc_block[3] = 0x00;                                             // Data Length First Byte
+    adc_block[4] = 0x00;                                             // Data Length Second Byte
+   
+    // [GPIO Data]
+   
+    adc_block[block_length+1] = (uint32_t)pio_block_cs;              // Checksum
+    adc_block[block_length+2] = 0x55;                                // Trailer
+}
+
+
+void send_adc(uint16_t block_length) {
+    for (int i=0; i < (block_length + 7); i++) {
+        printf("\nRX: %u", adc_block[i]);
     }
 }
 
@@ -433,8 +457,11 @@ uint16_t numCycles;
     while (true) {
         run_pulse(numCycles);
 
-        build_return_block(numCycles);
-        send_block(numCycles);
+        build_return_pio(numCycles);
+        send_pio(numCycles);
+        sleep_ms(10);
+        build_return_adc(numCycles);
+        send_adc(numCycles);
         
         scan_for_input();
         numCycles = get_block(); // put this in an if statment depending on what scan_for_input returns
