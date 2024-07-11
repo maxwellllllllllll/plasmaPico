@@ -101,7 +101,7 @@ void __time_critical_func(on_pwm_wrap)() {
     //target = 52; //block[cycleCount];
     
     // Update nextState for next cycle
-    if (target < 100) { // Negative pulses
+    if (target > 100) { // Negative pulses
         nextState = negCycle;
         delay = target * 5; // Delay in PIO cycles @ 25 MHz
     } else { // Positive pulses
@@ -257,6 +257,31 @@ void run_pulse(uint16_t pulseCycles) {
     delay = 250;
     nextState = (stop2free << 24) | (( delay << 8) | free2stop);
 
+
+    // Sets up PID
+    // PID Definitions (TODO: Figure out if I want this here or in header)
+    #define PID_KP 1.0f
+    #define PID_KI 1.0f
+    #define PID_KD 1.0f
+
+    #define PID_TAU 0.02f
+
+    #define PID_LIM_MIN -100.0f
+    #define PID_LIM_MAX 100.0f
+    
+    #define PID_LIM_MIN_INT -50.0f
+    #define PID_LIM_MAX_INT 50.0f
+
+    #define SAMPLE_TIME_S 0.00002 // 20 us
+
+    pid_controller pid = {  PID_KP, PID_KI, PID_KD,
+                            PID_TAU,
+                            PID_LIM_MIN, PID_LIM_MAX,
+			                PID_LIM_MIN_INT, PID_LIM_MAX_INT,
+                            SAMPLE_TIME_S };
+
+    pid_controller_init(&pid);
+
     // Start PWM
     pwm_set_enabled(0, true);
 
@@ -264,10 +289,11 @@ void run_pulse(uint16_t pulseCycles) {
     for (uint16_t cycle = 0; cycle <= pulseCycles; cycle++) {
         setpoint = block[cycle];
 
-        pio_block[cycle + 5] = setpoint; // TODO: change how blocks are assembled so this is just cycle
-
-        measurement = adc_read() * conversion_factor;
+        measurement = adc_read() * conversion_factor; // NOTE: ADC sample comes under 20us earlier than pio output
         adc_block[cycle + 5] = measurement * 100; // To avoid sending floats in block
+
+        // Loads PID modilated waveform to return array
+        pio_block[cycle + 5] = setpoint;
 
         while (true) {
             if (pwm_flag == 1) {target = setpoint; pwm_flag = 0; break;}
@@ -392,7 +418,7 @@ uint16_t get_block(){
 }
 
 
-void build_return_pio(uint16_t block_length) {
+void build_return_pio(uint16_t block_length) { // for some reason a general return func doesn't work as well TODO: figure out why
 
     // Return GPIO Block
     // Build GPIO Block
@@ -440,7 +466,7 @@ void send_adc(uint16_t block_length) {
 }
 
 
-int main() {
+int main() { //TODO: Rewrite so that command pulses are possible (enable/disable pid, etc.)
 uint16_t numCycles;
 
     stdio_init_all();
@@ -462,6 +488,7 @@ uint16_t numCycles;
         sleep_ms(10);
         build_return_adc(numCycles);
         send_adc(numCycles);
+
         
         scan_for_input();
         numCycles = get_block(); // put this in an if statment depending on what scan_for_input returns
