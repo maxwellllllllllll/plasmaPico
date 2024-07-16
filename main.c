@@ -145,7 +145,7 @@ void __time_critical_func(on_pwm_wrap)() {
     // Update nextState for next cycle
     if (target < 100) { // Negative pulses
         nextState = negCycle;
-        delay = (target) * 5; // Delay in PIO cycles @ 25 MHz
+        delay = (100-target) * 5; // Delay in PIO cycles @ 25 MHz
     } else { // Positive pulses
         nextState = possCycle;
         delay = (target-100) * 5; // Delay in PIO cycles @ 25 MHz
@@ -247,6 +247,7 @@ void run_pulse(uint16_t pulseCycles) {
     uint32_t setpoint;
     float measurement; // ADC in
     const float conversion_factor = 3.3f / (1 << 12); // Converts ADC signal to voltage
+    const float scale_factor = 50.0f; // Scales ADC result to -100 - 100 range
 
     // Loads freewheeling state as first PWM pulse
     delay = 250;
@@ -259,8 +260,8 @@ void run_pulse(uint16_t pulseCycles) {
     #define PID_KI 1.0f
     #define PID_KD 1.0f
 
-    #define PID_LIM_MIN 0.0f
-    #define PID_LIM_MAX 200.0f
+    #define PID_LIM_MIN -100.0f
+    #define PID_LIM_MAX 100.0f
     
     #define PID_LIM_MIN_INT 0.0f
     #define PID_LIM_MAX_INT 100.0f
@@ -281,14 +282,14 @@ void run_pulse(uint16_t pulseCycles) {
     for (uint16_t cycle = 0; cycle <= pulseCycles; cycle++) {
         setpoint = block[cycle];
 
-        measurement = (adc_read() * conversion_factor) * 100; // NOTE: ADC sample comes under 20us earlier than pio output (0-200)
-        adc_block[cycle + 5] = measurement;
+        measurement = (adc_read() * conversion_factor * scale_factor); // NOTE: ADC sample comes under 20us earlier than pio output (0-200)
+        adc_block[cycle + 5] = measurement + 100;
 
         // PID Control
-        pid_controller_update(&pid, setpoint, measurement);
+        pid_controller_update(&pid, (float)setpoint, measurement);
 
         // Loads PID modilated waveform to return array
-        pio_block[cycle + 5] = ((uint32_t)(pid.out));
+        pio_block[cycle + 5] = ((uint32_t)(pid.out) + 100);
 
         //printf("\nSP: %u, ADC: %f, PID: %u", setpoint, measurement, pio_block[cycle+5]);
 
