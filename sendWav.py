@@ -9,7 +9,6 @@ def buildTransferBlock(dataBytes: bytearray):
     #print(length)
     out = bytearray(length + 7)
 
-
     out[0] = 0x55                                              # Head
     out[1] = 0x3C                                              # Sync
     out[2] = 0x01                                              # Block Type (Data Block (TODO: Change name))
@@ -17,7 +16,7 @@ def buildTransferBlock(dataBytes: bytearray):
     out[4] = length.to_bytes(2, 'little')[1]                   # Data Length Second Byte
 
     # Set data
-    for i in range(0, length): #remove the -1
+    for i in range(0, length):
         out[i+5] = dataBytes[i]                                # Data
     
     # Compute checksum
@@ -54,7 +53,7 @@ def buildTestDataBlock():
     flip = False
     for i in range(dataLength):
         #print(j)
-        dataBytes.append(math.floor(j))
+        dataBytes.append(j)
 
         if flip == False:
             j = 150
@@ -75,17 +74,26 @@ def buildSineDataBlock():
     j = 50
     flip = False
     for i in range(dataLength):
-        dataBytes.append(math.floor(j))
+        dataBytes.append(j)
 
         if flip == False:
-            j += 0.1
+            j += 1
         elif flip == True:
-            j -= 0.1
+            j -= 1
         
         if j >= 200:
             flip = True
         elif j <= 1:
             flip = False
+    
+    return dataBytes
+
+
+def buildZeroDataBlock():
+    dataBytes = bytearray()
+
+    for i in range(dataLength):
+        dataBytes.append(100)
     
     return dataBytes
 
@@ -128,8 +136,12 @@ while True:
             dataBytes = buildSineDataBlock()
             break
 
+        elif inp == '0':
+            dataBytes = buildZeroDataBlock()
+            break
+
     transferBlock = buildTransferBlock(dataBytes)
-    ser.write(transferBlock) 
+    ser.write(transferBlock)
     print("written")
 
     print("pio")

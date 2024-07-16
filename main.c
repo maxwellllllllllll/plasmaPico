@@ -65,9 +65,6 @@ typedef struct {
     float Ki;
     float Kd;
 
-    /* Derivative low-pass filter time constant */
-    float tau;
-
     /* Output limits */
     float limMin;
     float limMax;
@@ -91,37 +88,6 @@ typedef struct {
 } pid_controller;
 
 
-void __time_critical_func(on_pwm_wrap)() {
-    pwm_clear_irq(0);
-
-    //pio_sm_put(pio0, sm, nextState);
-    pio0->txf[sm] = nextState; // Same as pio_sm_put without checking
-
-    // // Calculates delay from data block
-    //target = 52; //block[cycleCount];
-    
-    // Update nextState for next cycle
-    if (target > 100) { // Negative pulses
-        nextState = negCycle;
-        delay = target * 5; // Delay in PIO cycles @ 25 MHz
-    } else { // Positive pulses
-        nextState = possCycle;
-        delay = (target - 100) * 5; // Delay in PIO cycles @ 25 MHz
-    }
- 
-    if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
-    if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
-    nextState = nextState | ( delay << 8);
-
-    // for debugging
-    //next_state_block[cycleCount] = nextState;
-
-    pwm_flag = 1;
- 
-    cycleCount++;
-}
-
-
 void pid_controller_init(pid_controller *pid) {
 
     // Clear controller variables
@@ -135,21 +101,19 @@ void pid_controller_init(pid_controller *pid) {
 }
 
 
-float pid_controller_update(pid_controller *pid, float setpoint, float measurement) {
+float __time_critical_func(pid_controller_update)(pid_controller *pid, float setpoint, float measurement) {
 
     float error = setpoint - measurement;
 
     float proportional = pid->Kp * error;
 
     // Integral
-    pid->integrator = pid->integrator + 0.5f * pid->Ki * pid->T * (error + pid->prevError);
+    pid->integrator = pid-> Ki * pid->T * (pid->integrator + error);
 
     // TODO: Add integrator clamping
 
     // Derivative
-    pid->differentiator = -(2.0f * pid->Kd * (measurement - pid->prevMeasurement) // NOTE: understand this better
-                        + (2.0f * pid->tau - pid->T) * pid->differentiator)
-                        / (2.0f * pid->tau + pid->T);
+    pid->differentiator = error - pid->prevError;
 
 
     // Compute output and apply limits
@@ -166,6 +130,37 @@ float pid_controller_update(pid_controller *pid, float setpoint, float measureme
 
     // Return controller output
     return pid->out;
+}
+
+
+void __time_critical_func(on_pwm_wrap)() {
+    pwm_clear_irq(0);
+
+    //pio_sm_put(pio0, sm, nextState);
+    pio0->txf[sm] = nextState; // Same as pio_sm_put without checking
+
+    // // Calculates delay from data block
+    //target = 52; //block[cycleCount];
+    
+    // Update nextState for next cycle
+    if (target < 100) { // Negative pulses
+        nextState = negCycle;
+        delay = (target) * 5; // Delay in PIO cycles @ 25 MHz
+    } else { // Positive pulses
+        nextState = possCycle;
+        delay = (target-100) * 5; // Delay in PIO cycles @ 25 MHz
+    }
+ 
+    if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
+    if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
+    nextState = nextState | ( delay << 8);
+
+    // for debugging
+    //next_state_block[cycleCount] = nextState;
+
+    pwm_flag = 1;
+ 
+    cycleCount++;
 }
 
 
@@ -264,18 +259,15 @@ void run_pulse(uint16_t pulseCycles) {
     #define PID_KI 1.0f
     #define PID_KD 1.0f
 
-    #define PID_TAU 0.02f
-
-    #define PID_LIM_MIN -100.0f
-    #define PID_LIM_MAX 100.0f
+    #define PID_LIM_MIN 0.0f
+    #define PID_LIM_MAX 200.0f
     
-    #define PID_LIM_MIN_INT -50.0f
-    #define PID_LIM_MAX_INT 50.0f
+    #define PID_LIM_MIN_INT 0.0f
+    #define PID_LIM_MAX_INT 100.0f
 
     #define SAMPLE_TIME_S 0.00002 // 20 us
 
     pid_controller pid = {  PID_KP, PID_KI, PID_KD,
-                            PID_TAU,
                             PID_LIM_MIN, PID_LIM_MAX,
 			                PID_LIM_MIN_INT, PID_LIM_MAX_INT,
                             SAMPLE_TIME_S };
@@ -289,14 +281,19 @@ void run_pulse(uint16_t pulseCycles) {
     for (uint16_t cycle = 0; cycle <= pulseCycles; cycle++) {
         setpoint = block[cycle];
 
-        measurement = adc_read() * conversion_factor; // NOTE: ADC sample comes under 20us earlier than pio output
-        adc_block[cycle + 5] = measurement * 100; // To avoid sending floats in block
+        measurement = (adc_read() * conversion_factor) * 100; // NOTE: ADC sample comes under 20us earlier than pio output (0-200)
+        adc_block[cycle + 5] = measurement;
+
+        // PID Control
+        pid_controller_update(&pid, setpoint, measurement);
 
         // Loads PID modilated waveform to return array
-        pio_block[cycle + 5] = setpoint;
+        pio_block[cycle + 5] = ((uint32_t)(pid.out));
+
+        //printf("\nSP: %u, ADC: %f, PID: %u", setpoint, measurement, pio_block[cycle+5]);
 
         while (true) {
-            if (pwm_flag == 1) {target = setpoint; pwm_flag = 0; break;}
+            if (pwm_flag == 1) {target = pio_block[cycle + 5]; pwm_flag = 0; break;}
         }
     }
 
@@ -437,7 +434,7 @@ void build_return_pio(uint16_t block_length) { // for some reason a general retu
 
 void send_pio(uint16_t block_length) {
     for (int i=0; i < (block_length + 7); i++) {
-        printf("\nRX: %x", pio_block[i]);
+        printf("\nRX: %u", pio_block[i]);
     }
 }
 
