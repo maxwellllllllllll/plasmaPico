@@ -2,7 +2,7 @@ import serial
 import math
 import pandas as pd
 
-dataLength = 10000 # 10,000
+dataLength = 10000 # 10,000 --> 200ms
 
 def buildTransferBlock(dataBytes: bytearray):
     length = len(dataBytes)
@@ -71,10 +71,10 @@ def buildTestDataBlock():
 def buildSineDataBlock():
     dataBytes = bytearray()
 
-    j = 50
+    j = 0
     flip = False
     for i in range(dataLength):
-        dataBytes.append(j)
+        dataBytes.append(int(j))
 
         if flip == False:
             j += 1
@@ -139,6 +139,22 @@ while True:
         elif inp == '0':
             dataBytes = buildZeroDataBlock()
             break
+
+        elif inp == 'm':
+            print("Entering manual operation mode...")
+            while True:
+                s1State = int(input("S1: "))
+                s2State = int(input("S2: "))
+                s3State = int(input("S3: "))
+                s4State = int(input("S4: "))
+
+                ser.write([0x55, 0x3C, 0x02, s1State, s2State, s3State, s4State])
+
+                print(ser.readline())
+                print(ser.readline())
+                print(ser.readline())
+
+                print("States Sent")
 
     transferBlock = buildTransferBlock(dataBytes)
     ser.write(transferBlock)

@@ -55,6 +55,7 @@ int state;
 // Block Types
 char block_type;
 #define DATA 0x01
+#define MANUAL 0x02
 
 
 // PID Controller
@@ -288,8 +289,8 @@ void run_pulse(uint16_t pulseCycles) {
         // PID Control
         pid_controller_update(&pid, (float)setpoint, measurement);
 
-        // Loads PID modilated waveform to return array
-        pio_block[cycle + 5] = ((uint32_t)(pid.out) + 100);
+        // Loads PID modilated waveform to return array 
+        pio_block[cycle + 5] = (uint32_t)(pid.out + 100);
 
         //printf("\nSP: %u, ADC: %f, PID: %u", setpoint, measurement, pio_block[cycle+5]);
 
@@ -340,6 +341,7 @@ void mem_init(uint16_t block_length) {
 }
 
 
+
 /*Once a block is detected by scan_for_input(), classifies and
 collects the rest of the block*/
 // TODO: Rewrite me to use terminator stuff!!
@@ -349,6 +351,8 @@ uint16_t get_block(){
     char block_length1;
     char block_length2;
     uint16_t block_length_uint;
+
+    char sw_state; // for manual switch control
 
     #define TRAILER 0x55
     #define DATA_BLOCK_LENGTH 256
@@ -404,7 +408,29 @@ uint16_t get_block(){
 
             break;
         
-        
+        case MANUAL: // NOTE: at this point, using manual breaks everything :(
+                     // TODO: make that... not the case
+
+            printf("in manual mode\n");
+            
+            // Initializes pins as direct outputs (may break pulses, not sure)
+            gpio_init(10);
+            gpio_set_dir(10, GPIO_OUT);
+            gpio_init(11);
+            gpio_set_dir(11, GPIO_OUT);
+            gpio_init(12);
+            gpio_set_dir(12, GPIO_OUT);
+            gpio_init(13);
+            gpio_set_dir(13, GPIO_OUT);
+
+            for(int i=0; i<4; i++) {
+                scanf("%c", &sw_state);
+
+                gpio_put(i+10, (bool)sw_state);
+            }
+
+            return 0;
+
         default:
             // handle this better
             printf("TYPE ERROR");
@@ -464,21 +490,35 @@ void send_adc(uint16_t block_length) {
 }
 
 
+
 int main() { //TODO: Rewrite so that command pulses are possible (enable/disable pid, etc.)
-uint16_t numCycles;
+    // Status indicator
+    const uint LED_PIN = 25;
+
+    gpio_init(LED_PIN);
+    gpio_set_dir(LED_PIN, GPIO_OUT);
+
+    gpio_put(LED_PIN, 1);
+
+
+    uint16_t numCycles;
 
     stdio_init_all();
-
-    scan_for_input();
-
-    numCycles = get_block();
-
-    sleep_ms(5000); // Needed to allow stdio init to complete without interfearing with FIFO buffers
-
     init_pulse();
 
     // Loops pulses for new inputs
     while (true) {
+
+        scan_for_input();
+
+        numCycles = get_block();
+
+        if (numCycles==0) {
+            continue;
+        }
+
+        sleep_ms(5000); // Needed to allow serial communication to complete without interfearing with FIFO buffers
+        
         run_pulse(numCycles);
 
         build_return_pio(numCycles);
@@ -486,18 +526,9 @@ uint16_t numCycles;
         sleep_ms(10);
         build_return_adc(numCycles);
         send_adc(numCycles);
-
-        
-        scan_for_input();
-        numCycles = get_block(); // put this in an if statment depending on what scan_for_input returns
-        sleep_ms(5000); // NOTE: will need to figure out where to do this once scan_for_input returns implimented
-
-        //add in break here if scan_for_input returns a different thing
     }
-    
 
     shutdown_pulse();
-
 
     return 0;
 }
