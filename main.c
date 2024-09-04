@@ -261,8 +261,8 @@ void run_pulse(uint16_t pulseCycles) {
     #define PID_KI 1.0f
     #define PID_KD 1.0f
 
-    #define PID_LIM_MIN -100.0f
-    #define PID_LIM_MAX 100.0f
+    #define PID_LIM_MIN 0.0f
+    #define PID_LIM_MAX 200.0f
     
     #define PID_LIM_MIN_INT 0.0f
     #define PID_LIM_MAX_INT 100.0f
@@ -290,7 +290,7 @@ void run_pulse(uint16_t pulseCycles) {
         pid_controller_update(&pid, (float)setpoint, measurement);
 
         // Loads PID modilated waveform to return array 
-        pio_block[cycle + 5] = (uint32_t)(pid.out + 100);
+        pio_block[cycle + 5] = (uint32_t)(pid.out);
 
         //printf("\nSP: %u, ADC: %f, PID: %u", setpoint, measurement, pio_block[cycle+5]);
 
