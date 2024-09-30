@@ -2,7 +2,7 @@ import serial
 import math
 import pandas as pd
 
-dataLength = 10000 # 10,000 --> 200ms
+dataLength = 80 # 10,000 --> 200ms
 
 def buildTransferBlock(dataBytes: bytearray):
     length = len(dataBytes)
@@ -77,9 +77,9 @@ def buildSineDataBlock():
         dataBytes.append(int(j))
 
         if flip == False:
-            j += 1
+            j += 0.1
         elif flip == True:
-            j -= 1
+            j -= 0.1
         
         if j >= 200:
             flip = True
@@ -94,6 +94,14 @@ def buildZeroDataBlock():
 
     for i in range(dataLength):
         dataBytes.append(100)
+    
+    return dataBytes
+
+def build50DataBlock():
+    dataBytes = bytearray()
+
+    for i in range(dataLength):
+        dataBytes.append(5)
     
     return dataBytes
 
@@ -155,6 +163,10 @@ while True:
                 print(ser.readline())
 
                 print("States Sent")
+
+        elif inp == '50':
+            dataBytes = build50DataBlock()
+            break
 
     transferBlock = buildTransferBlock(dataBytes)
     ser.write(transferBlock)
