@@ -290,7 +290,7 @@ void run_pulse(uint16_t pulseCycles) {
         pid_controller_update(&pid, (float)setpoint, measurement);
 
         // Loads PID modilated waveform to return array 
-        pio_block[cycle + 5] = (uint32_t)(pid.out);
+        pio_block[cycle + 5] = setpoint; //(uint32_t)(pid.out);
 
         //printf("\nSP: %u, ADC: %f, PID: %u", setpoint, measurement, pio_block[cycle+5]);
 
