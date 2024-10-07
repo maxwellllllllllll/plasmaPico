@@ -1,8 +1,7 @@
 import serial
-import math
 import pandas as pd
 
-dataLength = 80 # 10,000 --> 200ms
+dataLength = 10000 # 10,000 --> 200ms
 
 def buildTransferBlock(dataBytes: bytearray):
     length = len(dataBytes)
