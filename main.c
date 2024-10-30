@@ -44,6 +44,9 @@ uint8_t adc_block_cs;
 // Facilitates cpu-pwm communication
 uint8_t __not_in_flash("pwm") pwm_flag;
 
+// Helps with lower bound on DCP edge case
+uint8_t __not_in_flash("pwm") last_state = 0;
+
 
 // Device States
 int state;
@@ -151,9 +154,20 @@ void __time_critical_func(on_pwm_wrap)() {
         nextState = possCycle;
         delay = (target-100) * 5; // Delay in PIO cycles @ 25 MHz
     }
- 
-    if (delay < 25) {nextState = freeCycle;} // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
-    if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%
+
+    // Lower bound on DCP (1 us + switching time)/20 us ~7.5%
+    if (delay < 25) {
+        if (delay > 12 && last_state == 0) { // Subdivides the lower bound "dead zone" into two sections and emulates 3.75% power for that zone
+            delay = 25;
+            last_state = 1;
+        } else {
+            nextState = freeCycle;
+            last_state = 0;
+        }
+    } else {
+        if (delay > 450) {delay = 450;}          // Upper bound on DCP (18 us + switching time)/20 us ~92.5%    
+    }
+
     nextState = nextState | ( delay << 8);
 
     // for debugging
@@ -251,6 +265,7 @@ void run_pulse(uint16_t pulseCycles) {
     const float scale_factor = 50.0f; // Scales ADC result to -100 - 100 range
 
     // Loads freewheeling state as first PWM pulse
+    // TODO: why is this here?
     delay = 250;
     nextState = (stop2free << 24) | (( delay << 8) | free2stop);
 
